@@ -1,0 +1,15 @@
+# format_version: 1
+# source_software: WAsP Engineering 4.x
+# crs: EPSG:32629
+# speedup_reference: model_reference
+# mast_id: M01
+# direction_convention: from_north_clockwise
+# stability: neutral
+# terrain_description: DEM Copernicus GLO-30 + carte rugosite projet_v3.map, domaine 20x20 km, resolution 25 m
+# author: Nom Prenom
+# date: 2026-09-22
+point_id,point_type,x,y,height_m,sector_deg,speedup,turning_deg,ti,inflow_deg,z0_upstream_m
+M01,mast,512345.0,3598765.0,120,0,1.032,1.4,0.092,2.1,0.03
+M01,mast,512345.0,3598765.0,120,10,1.028,1.1,0.093,1.9,0.03
+WTG01,turbine,512890.0,3599120.0,120,0,1.085,-2.3,0.088,3.4,0.03
+WTG01,turbine,512890.0,3599120.0,120,10,1.079,-1.8,0.089,3.1,0.03

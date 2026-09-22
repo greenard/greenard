@@ -2,7 +2,14 @@
 
 > Application web de prévision météorologique (Module A « Météo ») et de prévision de production éolienne (Module B « Énergie »).
 >
-> Version 0.1 — 2026-09-22 — **en attente de validation**. Aucun code applicatif n'est écrit avant votre accord sur cette note ; les points à trancher sont regroupés en §11.
+> Version 0.2 — 2026-09-22 — intègre les réponses aux questions Q1–Q7 (journal des décisions en §11). **En attente de validation finale** avant le jalon 1.
+>
+> Changements par rapport à la v0.1 :
+> - authentification multi-utilisateurs dès le jalon 1 (§8.1) ;
+> - speed-ups WAsP Engineering comme voie principale de transposition, avec spécification du format d'import (§5.3) ;
+> - sources de données gouvernées par licence (non commercial / commercial) et par coût (gratuit / payant, activation explicite) (§4.3.5) ;
+> - déploiement sur serveur local (§2.5) ;
+> - dimensionnement pour des parcs de 59 à 400 MW (§5.2, étape 4).
 
 ---
 
@@ -18,7 +25,7 @@
 8. [Exigences transversales](#8-exigences-transversales)
 9. [Stratégie de tests](#9-stratégie-de-tests)
 10. [Plan de jalons](#10-plan-de-jalons)
-11. [Limites identifiées et décisions à valider](#11-limites-identifiées-et-décisions-à-valider)
+11. [Limites identifiées et journal des décisions](#11-limites-identifiées-et-journal-des-décisions)
 
 ---
 
@@ -30,7 +37,7 @@
 | **Données brutes des modèles** | En production, les valeurs viennent du point de grille lui-même (GRIB natif), sans la réduction d'échelle implicite appliquée par certaines API (voir §4.3.3). |
 | **Reproductibilité** | Un run = un enregistrement immuable : run NWP (date d'initialisation, membres), versions logicielles, paramètres, hypothèses de pertes, empreinte (hash) des fichiers d'entrée. |
 | **Séparation calcul / interface** | Tout calcul de plus de 2 s passe par une file de tâches, avec progression visible. L'API reste réactive. |
-| **Exclusivement libre / gratuit** | Aucune dépendance sous licence payante. Quand une brique « de référence » est propriétaire (WAsP), on le dit et on propose l'alternative libre (§5.3). |
+| **Libre et gratuit par défaut** | Aucune dépendance logicielle sous licence payante. Les résultats d'outils propriétaires dont vous avez la licence (WAsP Engineering) entrent par **import de fichiers** (§5.3). Les sources de données payantes restent optionnelles, désactivées par défaut et activées explicitement (§4.3.5). |
 | **UTC partout** | Stockage et calcul en UTC ; l'heure locale n'intervient qu'à l'affichage. |
 
 ---
@@ -49,7 +56,7 @@
 | Voisinage | **scipy.spatial.cKDTree** | Recherche des plus proches voisins sur la grille icosaédrique ICON (≈ 2,9 M cellules) en quelques ms après construction. | BallTree scikit-learn : équivalent mais dépendance plus lourde. |
 | Sillages | **PyWake** (DTU, licence MIT) | Référence ouverte, modèles de la littérature déjà implémentés, mode séries temporelles, `XRSite` pour speed-ups. | FLORIS (NREL) : bon, mais l'intégration d'un site hétérogène est moins directe. |
 | Formats éoliens | **WindKit** (DTU, BSD-3) | Lecture des `.map`, `.wtg`, `.tab`, `.gwc` WAsP, structures de données compatibles PyWake. | Parsers maison : à écrire seulement si WindKit échoue sur un fichier. |
-| Écoulement en relief | **WindNinja** (USFS, libre), en conteneur séparé | Seul modèle d'écoulement libre, maintenu et documenté, qui produit des champs de vent 3D sur un MNT : speed-ups et déviations par secteur. **Voir la limite en §5.3.** | Modèle linéarisé WAsP (via PyWAsP) : **licence payante**, donc exclu par la contrainte « gratuit ». |
+| Écoulement en relief | **Import des speed-ups WAsP Engineering** (voie principale, vous disposez de la licence) ; **WindNinja** (USFS, libre) en repli, dans un conteneur séparé | Les speed-ups et déviations sont calculés par l'équipe dans WAsP Engineering, hors de l'application, puis importés (§5.3). L'application reste 100 % libre et reprend les résultats du modèle de référence. WindNinja couvre les projets sans étude WAsP. | Pilotage direct de WAsP via PyWAsP : exige une licence PyWAsP distincte de la licence WAsP desktop, à vérifier ; possible plus tard derrière la même interface. |
 | Raster | **rasterio / GDAL** | MNT, occupation du sol, reprojection. | — |
 | ML | **LightGBM** (objectif `quantile`) | Rapide, gère nativement les valeurs manquantes, régression quantile intégrée. XGBoost reste possible via une interface commune. | Réseaux de neurones : peu justifiés avec ~1 an de données de calibration. |
 | Scores probabilistes | **scoringrules** (ou implémentation interne testée) | CRPS d'ensemble et CRPS paramétrique, pinball loss. | properscoring : n'est plus maintenu. |
@@ -89,10 +96,16 @@ RQ serait plus simple, mais n'offre ni ordonnanceur intégré ni routage fin des
 
 ### 2.5 Déploiement
 
-**Docker Compose** avec les services `db` (postgis), `redis`, `api`, `worker-io`, `worker-compute`, `beat`, `frontend` (nginx) et `windninja`.
+**Cible : serveur local (Linux) sous Docker Compose.** Services : `db` (postgis), `redis`, `api`, `worker-io`, `worker-compute`, `beat`, `frontend` (nginx), `proxy` (Caddy) et `windninja` (profil optionnel).
 
 - Image Python de base **micromamba / conda-forge** : ecCodes, GDAL et PROJ y sont fournis de façon fiable, contrairement aux wheels pip.
-- Configuration par variables d'environnement (`.env.example` fourni).
+- Configuration par variables d'environnement (`.env.example` fourni) ; secrets (clé JWT, mot de passe BDD, clés d'API éventuelles) hors du dépôt.
+- **HTTPS** sur le réseau interne via Caddy, avec certificat de l'entreprise ou CA interne. Seul le port 443 est exposé.
+- **Accès Internet sortant** requis vers NOAA/AWS, ECMWF, DWD, Open-Meteo et Copernicus. Le proxy d'entreprise est pris en charge (`HTTPS_PROXY`, `NO_PROXY`). Un fonctionnement totalement isolé (air-gap) n'est pas prévu.
+- **Sauvegardes** : `pg_dump` quotidien et sauvegarde du volume de fichiers (script et procédure de restauration fournis).
+- **Dimensionnement recommandé** :
+  - 16 vCPU et 64 Go de RAM (minimum 8 vCPU / 32 Go) ;
+  - 1 To de SSD : MNT, GRIB temporaires, archives de prévisions, résultats.
 - README d'installation livré au jalon 1.
 
 ---
@@ -292,7 +305,7 @@ Pas cibles : **10 min, 15 min, 1 h, 3 h**.
 
 | Usage | Source | Remarques |
 |---|---|---|
-| Prototypage (jalon 2a) | **API Open-Meteo** | Rapide, unifiée. **Deux pièges** : (1) Open-Meteo applique par défaut une **correction d'altitude** et une sélection de maille ; on force `cell_selection=nearest`, on interroge aux **coordonnées exactes du nœud**, et on neutralise la correction d'altitude (`elevation=nan`) pour obtenir la valeur brute du point ; (2) **licence** : l'API gratuite est réservée à un **usage non commercial** (voir §11). |
+| Prototypage (jalon 2a) | **API Open-Meteo** | Rapide, unifiée. **Deux pièges** : (1) Open-Meteo applique par défaut une **correction d'altitude** et une sélection de maille ; on force `cell_selection=nearest`, on interroge aux **coordonnées exactes du nœud**, et on neutralise la correction d'altitude (`elevation=nan`) pour obtenir la valeur brute du point ; (2) **licence** : l'API gratuite est réservée à un **usage non commercial**. Trois modes, choisis par configuration : `public` (gratuit, non commercial, mode actuel), `api_key` (abonnement commercial, `customer-api.open-meteo.com`), `self_hosted` (instance Open-Meteo auto-hébergée, code AGPL). Voir §4.3.5. |
 | Production (jalon 2b) | GRIB2 natif | GFS : NOMADS grib filter (sous-domaine + variables) ou AWS avec plages d'octets `.idx`. IFS : `ecmwf-opendata`, qui télécharge par variable ; le découpage est fait localement. ICON : fichiers `.grib2.bz2` par variable et par échéance, décompression puis extraction **par index de cellule**. |
 | Découpage spatial | Local ou serveur | Le téléchargement de fichiers globaux par variable est inévitable pour IFS et ICON. Ils sont découpés immédiatement sur une boîte englobant les points sélectionnés (+ marge), puis supprimés. Seuls les extraits sont conservés (NetCDF, quelques Mo). |
 | Ensembles | GEFS, ENS, ICON-EPS | Mêmes adaptateurs, avec une dimension `member`. |
@@ -308,7 +321,22 @@ Pas cibles : **10 min, 15 min, 1 h, 3 h**.
 
 > **Conséquence** : un **archiveur automatique** (Celery beat) est mis en place **dès le jalon 2**, pour extraire et conserver chaque run sur les points sélectionnés. Sans lui, la calibration ICON ne pourra reposer que sur Open-Meteo.
 
-#### 4.3.5 Exports et visualisation
+#### 4.3.5 Gouvernance des sources : licence d'usage et coût
+
+Chaque adaptateur de source déclare dans le catalogue (`data_source`) deux attributs.
+
+| Attribut | Valeurs | Effet |
+|---|---|---|
+| `usage_licence` | `open` (libre, y compris commercial : NOAA, DWD, ECMWF open data CC-BY 4.0, Copernicus) · `non_commercial` (Open-Meteo public) · `contract` (abonnement) | Un paramètre d'instance `DEPLOYMENT_USAGE=internal|commercial` est défini à `internal` aujourd'hui. En mode `commercial`, les sources `non_commercial` sont **bloquées** avec un message explicite, et l'administrateur doit basculer Open-Meteo en `api_key` ou `self_hosted`. **Le passage au commercial ne change aucun code**, seulement la configuration. |
+| `cost` | `free` · `paid` | Les sources `paid` sont **désactivées par défaut**. Un administrateur les active en saisissant ses identifiants. L'utilisateur doit ensuite les **choisir explicitement** pour chaque téléchargement ; un badge « payant » et une confirmation s'affichent, et le choix est tracé dans le run. |
+
+**Sources payantes envisagées** (points d'extension, non implémentés tant que vous ne les commandez pas) :
+- ECMWF IFS HRES à 0,1° ou ENS à résolution native, via le catalogue temps réel ECMWF (frais de service éventuels) ;
+- Open-Meteo commercial (`api_key`).
+
+Le jalon 2 livre la **mécanique d'activation** et un rapport sur l'offre ECMWF 0,1° (gratuit ou non, modalités), sans souscription.
+
+#### 4.3.6 Exports et visualisation
 
 - **Exports CSV, XLSX, NetCDF**, avec les métadonnées suivantes :
   - modèle, run (init UTC), membre ;
@@ -338,7 +366,7 @@ Chaque import passe par un **validateur** qui renvoie une liste structurée `{li
 | Topographie | GeoTIFF, ou téléchargement automatique | **Copernicus DEM GLO-30** (AWS, sans compte) par défaut. SRTM : exige un compte NASA Earthdata, proposé seulement en option. |
 | Rugosité | `.map` WAsP (WindKit) ; raster d'occupation du sol **ESA WorldCover** (10 m, AWS) ou CORINE (hors Maroc) | Table classe → z0 éditable (voir ci-dessous). |
 
-> ⚠️ **NRG et Windographer** : les formats binaires natifs (`.rld`, `.rwd`, `.windographer`) sont propriétaires et non documentés. **Seuls leurs exports texte sont pris en charge.** Il faudra donc m'indiquer les formats réellement disponibles (§11).
+> ⚠️ **NRG et Windographer** : les formats binaires natifs (`.rld`, `.rwd`, `.windographer`) sont propriétaires et non documentés. **Seuls leurs exports texte sont pris en charge.** Décision Q3 : l'historique est fourni en CSV, cette limite ne bloque donc pas.
 
 **Contrôle qualité du mât** (drapeaux par valeur, jamais de suppression silencieuse) :
 
@@ -390,15 +418,15 @@ Méthodes cumulables, avec comparaison en validation croisée :
 
 #### Étape 3 — Transposition mât → éoliennes (relief et rugosité)
 
-Voir §5.3 pour le choix du modèle et ses limites.
+Voir §5.3 pour les sources de speed-ups et le format d'import.
 
-- **WindNinja** est exécuté pour 12 (ou 24) directions, avec vent d'entrée uniforme et stabilité neutre, sur un domaine MNT + z0 couvrant le parc et une marge d'environ 5 km.
-- On en tire, pour chaque position p (éoliennes et mât) et chaque direction d :
-  - `S(p, d) = ws(p, h_moyeu) / ws_ref(d)` ;
-  - `T(p, d) = wd(p) − d`.
-- **Speed-up relatif au mât** : `Speedup(p, d) = S(p, d) / S(mât, d)`. Le turning est défini de la même façon, relativement au mât.
-- Injection dans **`py_wake.site.XRSite`** : dataset avec les variables `Speedup(i, wd)`, `Turning(i, wd)`, `TI(i, wd)` et `P(wd)` pour le mode AEP. Interpolation entre directions assurée par XRSite.
-- Les résultats sont mis en cache par couple (layout, MNT, z0, paramètres) : ce calcul est coûteux mais ne dépend pas de la prévision.
+- Pour chaque position p (éoliennes et mât) et chaque direction de référence d, on dispose de :
+  - `S(p, d)` : speed-up absolu (rapport à l'écoulement de référence du modèle) ;
+  - `T(p, d)` : déviation (turning, en degrés).
+- **Normalisation au mât** : `Speedup(p, d) = S(p, h_moyeu, d) / S(mât, h, d)` et `Turning(p, d) = T(p, d) − T(mât, d)`. Si le fichier importé est déjà relatif au mât, la ligne du mât doit valoir 1,0 et 0° (contrôle).
+- **Direction** : la direction prévue et calibrée est celle *au mât*. On la convertit en direction de référence par inversion de `d_mât = d + T(mât, d)` (itération de point fixe, 2 ou 3 itérations suffisent).
+- Injection dans **`py_wake.site.XRSite`** : dataset avec les variables `Speedup(i, wd)`, `Turning(i, wd)` et `TI(i, wd)` si elle est fournie. L'interpolation entre secteurs est assurée par XRSite (linéaire en direction, avec continuité à 360°).
+- Les tables sont versionnées : chaque `energy_run` référence le jeu de speed-ups utilisé (hash du fichier).
 
 #### Étape 4 — Sillages (PyWake)
 
@@ -411,7 +439,7 @@ Voir §5.3 pour le choix du modèle et ses limites.
 | TI ambiante | TI mesurée au mât, par secteur et par classe de vitesse (écart-type/moyenne à 10 min, 90e percentile non utilisé en production) | Valeur fixe |
 | Parcs voisins | Désactivé | Éoliennes voisines ajoutées comme type distinct, puissance exclue du total |
 
-- **Performance** : une prévision de 14 jours à 10 min compte 2 016 pas ; pour 51 membres, cela fait environ 100 000 cas. Deux modes sont prévus :
+- **Performance** : une prévision de 14 jours à 10 min compte 2 016 pas ; pour 51 membres, cela fait environ 100 000 cas. Pour 400 MW, soit **~60 à 130 éoliennes** selon la machine (3 à 7 MW), le coût du calcul de sillage croît en n², et le mode direct devient lourd sur un serveur local. Deux modes sont prévus :
   - **direct** : `wfm(x, y, wd=…, ws=…, TI=…, time=True)`, exact, réservé à la validation et aux petits parcs ;
   - **table précalculée (LUT)**, par défaut : P(éolienne \| wd au pas de 1°, ws_ref au pas de 0,25 m/s, classe de TI), calculée une fois par configuration, puis interpolation. L'erreur d'interpolation LUT vs direct est mesurée et publiée dans le run (critère < 0,5 % sur l'énergie).
 - **Carte de champ de sillage** : `flow_map` PyWake pour une direction et une vitesse choisies, rendue en image géoréférencée superposée à MapLibre.
@@ -432,16 +460,72 @@ Pour chaque pas et chaque éolienne, on calcule :
 
 On obtient ensuite l'agrégation parc et l'énergie par intervalle.
 
-### 5.3 Transposition mât → éoliennes : choix et limites
+### 5.3 Transposition mât → éoliennes : sources de speed-ups et format d'import
 
-| Option | Libre ? | Adapté | Limite |
+#### 5.3.1 Sources, par ordre de priorité
+
+| Priorité | Source | Usage | Limite |
 |---|---|---|---|
-| WAsP IBZ (via PyWAsP / WindKit) | **Non** (licence WAsP payante) | Référence pour l'analyse de ressource bancable en terrain modéré | Exclu par la contrainte « gratuit ». Si vous disposez d'une licence, l'intégration est prévue via une interface commune. |
-| **WindNinja — solveur de conservation de masse** | Oui | Rapide (quelques minutes par direction), speed-ups et déviations cohérents | Pas de décollement ni de recirculation. Les speed-ups sont surestimés sur les crêtes raides et le sillage de relief est mal représenté dès que la pente dépasse environ 30 %, comme les modèles linéarisés (indice RIX). |
-| WindNinja — solveur momentum (OpenFOAM) | Oui | Meilleur en terrain complexe | Beaucoup plus lent (dizaines de minutes à heures par direction) ; proposé en option pour les sites de l'Atlas ou du Rif. |
-| Speed-ups importés (WAsP, WindSim, Meteodyn fournis par le client) | — | Si une étude de ressource existe déjà | Import d'un tableau speed-up/turning par éolienne et par secteur : **fortement recommandé** quand il existe, car c'est la solution la plus cohérente avec l'évaluation énergétique du parc. |
+| 1 | **Speed-ups WAsP Engineering** calculés par l'équipe (licence disponible) | Voie par défaut dès qu'un projet a un modèle WEng | Modèle linéarisé : décollement non représenté sur pentes raides (RIX > 5 %). Le RIX est recalculé par l'application sur le MNT, et une alerte est émise par éolienne. |
+| 2 | Autres logiciels (WindSim, Meteodyn, WAsP CFD) | Même format pivot | — |
+| 3 | Grille de ressource WAsP (`.rsf` / `.wrg`) | Repli si seuls ces fichiers existent | Speed-up **approximé** par le rapport des vitesses moyennes par secteur (Weibull A, k), **sans turning**. Marqué « approximatif » dans le run et le rapport. |
+| 4 | **WindNinja** (conservation de masse ; momentum en option) | Projets sans étude de ressource | Moins validé en évaluation énergétique ; pas de décollement (solveur de masse) ; solveur momentum lent. |
 
-**Recommandation** : WindNinja (conservation de masse) par défaut, **import de speed-ups externes** en option prioritaire. Le RIX est calculé pour chaque éolienne et une alerte est émise lorsqu'il dépasse 5 %.
+#### 5.3.2 Hauteurs : éviter le double comptage du cisaillement
+
+Le fichier déclare la hauteur de chaque ligne. Deux configurations sont acceptées :
+
+- **(A) — recommandée** : mât **et** éoliennes à la **hauteur de moyeu**. Le cisaillement mesuré au mât (étape 2) porte la vitesse du mât à la hauteur de moyeu ; WEng ne fait que la transposition horizontale. Cette configuration exploite au mieux la mesure.
+- **(B)** : mât à la **hauteur de mesure**, éoliennes à la hauteur de moyeu. WEng fait à la fois l'extrapolation verticale et la transposition. **L'étape 2 est alors désactivée automatiquement** pour éviter de compter deux fois le cisaillement.
+
+L'application détecte la configuration d'après les hauteurs et l'affiche avant validation.
+
+#### 5.3.3 Format pivot Greenard (CSV ou XLSX)
+
+Un gabarit est fourni : [`docs/templates/speedups_template.csv`](templates/speedups_template.csv).
+
+**En-tête de métadonnées** : lignes `# clé: valeur` en CSV, ou onglet `metadata` en XLSX.
+
+| Clé | Obligatoire | Exemple / valeurs |
+|---|---|---|
+| `format_version` | oui | `1` |
+| `source_software` | oui | `WAsP Engineering 4.x` |
+| `crs` | oui | `EPSG:32629` (coordonnées des lignes) |
+| `speedup_reference` | oui | `model_reference` (rapport à l'écoulement de référence du modèle) ou `mast` (déjà normalisé au mât) |
+| `mast_id` | oui | identifiant du mât présent dans les lignes |
+| `direction_convention` | oui | `from_north_clockwise` (direction météo « d'où vient le vent », référence de l'écoulement amont) |
+| `stability` | recommandé | `neutral` |
+| `terrain_description` | recommandé | MNT, carte de rugosité, domaine et résolution utilisés |
+| `author`, `date` | recommandé | traçabilité |
+
+**Colonnes** (format long : une ligne par point × hauteur × secteur) :
+
+| Colonne | Obligatoire | Unité | Description |
+|---|---|---|---|
+| `point_id` | oui | — | ID de l'éolienne (identique au layout) ou du mât |
+| `point_type` | oui | — | `turbine` \| `mast` |
+| `x`, `y` | oui | m (CRS déclaré) | Position utilisée dans WEng. Contrôle de cohérence avec le layout (tolérance 5 m). |
+| `height_m` | oui | m a.g.l. | Hauteur du calcul |
+| `sector_deg` | oui | ° | Direction centrale du secteur (0 = Nord) |
+| `speedup` | oui | — | Rapport de vitesse (> 0) |
+| `turning_deg` | oui | ° | Déviation, positive dans le sens horaire |
+| `ti` | non | — | Intensité de turbulence modélisée (utilisée si la TI du mât n'est pas transposée) |
+| `inflow_deg` | non | ° | Angle d'inclinaison de l'écoulement (utile pour les pertes de performance) |
+| `z0_upstream_m` | non | m | Rugosité amont équivalente (diagnostic) |
+
+**Secteurs** : ils doivent être régulièrement espacés et couvrir 360°. Le minimum est 12 secteurs ; **36 secteurs (10°) sont recommandés** en relief marqué, car le turning varie vite d'un secteur à l'autre. WEng calcule n'importe quelle liste de directions, donc le surcoût reste faible.
+
+**Validation à l'import** (erreurs bloquantes en **gras**) :
+- **toutes les éoliennes du layout et le mât sont présents** ;
+- **grille secteurs × points complète** ;
+- **hauteur de moyeu cohérente** (±1 m) ;
+- speed-up entre 0,3 et 2,5 et turning entre −45° et +45° (avertissement au-delà) ;
+- en mode `mast`, la ligne du mât vaut 1,0 et 0° ;
+- écart de position avec le layout inférieur à 5 m.
+
+#### 5.3.4 Exports natifs WAsP Engineering
+
+Pour éviter une conversion manuelle, un **parseur de l'export natif WEng** (tableau de résultats par point et par direction) sera écrit au jalon 4, **à partir d'un exemple de fichier réel que vous me fournirez**. Je ne veux pas deviner les intitulés de colonnes d'une version de WEng que je ne peux pas vérifier. En attendant, le format pivot ci-dessus est la référence.
 
 ### 5.4 B3 — Pertes (taxonomie IEC 61400-15-2)
 
@@ -522,7 +606,10 @@ Les géométries sont en `geometry(…, 4326)`, avec le CRS de saisie d'origine 
 
 ```mermaid
 erDiagram
+  app_user ||--o{ project_member : ""
+  project ||--o{ project_member : ""
   project ||--o{ site : contient
+  data_source ||--o{ nwp_run : fournit
   project ||--o{ wind_farm : contient
   project ||--o{ met_mast : contient
   project ||--o{ terrain_layer : contient
@@ -548,12 +635,17 @@ erDiagram
 
 | Table | Colonnes principales |
 |---|---|
-| `project` | id, name, description, display_tz (`UTC` \| `Africa/Casablanca`), default_crs, created_at |
+| `app_user` | id, email (unique), full_name, password_hash (argon2id), is_admin, is_active, locale (`fr` \| `en`), created_at, last_login_at |
+| `project_member` | project_id, user_id, role (`owner` \| `engineer` \| `viewer`) |
+| `auth_session` | id, user_id, refresh_token_hash, expires_at, revoked_at, user_agent, ip |
+| `audit_log` | id, user_id, action, object_type, object_id, payload JSONB, at |
+| `data_source` | code (`open_meteo`, `nomads`, `aws_gfs`, `ecmwf_opendata`, `dwd_opendata`, …), usage_licence (`open` \| `non_commercial` \| `contract`), cost (`free` \| `paid`), enabled, mode (`public` \| `api_key` \| `self_hosted`), credentials_ref (secret hors BDD), terms_url |
+| `project` | id, created_by, name, description, display_tz (`UTC` \| `Africa/Casablanca`), default_crs, created_at |
 | `site` | id, project_id, name, geom Point, input_crs, input_x, input_y, dem_elevation_m |
 | `nwp_model` | code (`gfs`, `ifs`, `icon`, `icon_eu`, `gefs`, `ens`, `icon_eps`, `aifs`), grid_type (`regular` \| `icosahedral`), resolution, domain geom Polygon, native_steps JSONB (paliers d'échéances), max_lead_h, n_members, heights JSONB |
 | `grid_point` | id, model_id, native_index (i,j ou cell_idx), geom Point, model_elevation_m, land_fraction ; contrainte UNIQUE(model_id, native_index) |
 | `site_grid_point` | site_id, grid_point_id, rank, distance_m, azimuth_deg, dem_elevation_m, elevation_diff_m, contains_site bool, selected bool |
-| `nwp_run` | id, model_id, init_time UTC, source, retrieved_at, members, status, source_meta JSONB (URL, hash) ; UNIQUE(model_id, init_time, source) |
+| `nwp_run` | id, model_id, init_time UTC, data_source_code, paid bool, retrieved_at, members, status, source_meta JSONB (URL, hash) ; UNIQUE(model_id, init_time, source) |
 | `forecast_extract` | id, nwp_run_id, site_id, file_uri, variables JSONB, heights JSONB, t_start, t_end, target_step, interp_method, speed_method |
 | `wind_farm` | id, project_id, name, boundary Polygon, is_neighbour bool |
 | `turbine_type` | id, name, rotor_d_m, rated_kw, rho_ref, cut_in, cut_out, restart_ws, power_curve JSONB, ct_curve JSONB, density_curves JSONB, temp_derating JSONB, source_file_uri, file_hash |
@@ -562,10 +654,10 @@ erDiagram
 | `mast_sensor` | id, mast_id, kind, height_m, boom_dir_deg, unit, column_name |
 | `mast_dataset` | id, mast_id, file_uri, format, t_start, t_end, qc_summary JSONB, file_hash |
 | `terrain_layer` | id, project_id, kind (`dem` \| `roughness` \| `landcover`), source, file_uri, crs, resolution_m, z0_table JSONB |
-| `flow_result` | id, farm_id, mast_id, model (`windninja_mass` \| `windninja_momentum` \| `imported`), n_sectors, params JSONB, speedup_uri, dem_layer_id, rough_layer_id, cache_key |
+| `flow_result` | id, farm_id, mast_id, model (`imported_weng` \| `imported_other` \| `wasp_rsf_approx` \| `windninja_mass` \| `windninja_momentum`), source_software, speedup_reference (`model_reference` \| `mast`), height_config (`A_hub` \| `B_measurement`), n_sectors, metadata JSONB, file_hash, validation_report JSONB, params JSONB, speedup_uri, dem_layer_id, rough_layer_id, cache_key |
 | `calibration_model` | id, project_id, mast_id, method, training_start/end, features JSONB, cv_metrics JSONB, artifact_uri, lib_versions JSONB |
 | `loss_config` | id, project_id, name, items JSONB (catégorie, sous-catégorie, actif, mode, valeur/paramètres, source), version |
-| `energy_run` | id, farm_id, flow_result_id, calibration_model_id, loss_config_snapshot JSONB, wake_config JSONB, target_step, horizon_h, mode (`direct` \| `lut`), status, progress, software_versions JSONB, git_sha, result_uri, created_at |
+| `energy_run` | id, created_by, farm_id, flow_result_id, calibration_model_id, loss_config_snapshot JSONB, wake_config JSONB, target_step, horizon_h, mode (`direct` \| `lut`), status, progress, software_versions JSONB, git_sha, result_uri, created_at |
 | `energy_run_input` | energy_run_id, nwp_run_id, weight |
 | `turbine_result` | energy_run_id, turbine_id, energy_free_mwh, energy_gross_mwh, energy_net_mwh, capacity_factor, losses JSONB, quantiles JSONB |
 | `evaluation` | id, energy_run_id, obs_source, period, metrics JSONB (par échéance) |
@@ -602,7 +694,21 @@ GET  /api/v1/tasks/{id}/events                SSE progression
 - **Traçabilité** : voir §6. Chaque export contient un bloc `provenance`.
 - **i18n** : textes de l'interface, codes d'erreur et rapport PDF disponibles en FR et en EN.
 - **Journalisation** : logs JSON structurés, avec id de tâche et de run.
-- **Sécurité** : authentification simple (jeton) en option au jalon 1, à confirmer (§11). Taille des fichiers importés limitée ; archives zip décompressées sans extraction de chemins arbitraires (protection contre le *zip slip*).
+- **Sécurité** : voir §8.1. Taille des fichiers importés limitée ; archives zip décompressées sans extraction de chemins arbitraires (protection contre le *zip slip*) ; parseurs XML (KML, `.wtg`) protégés contre les entités externes (`defusedxml`).
+
+### 8.1 Authentification et autorisations (multi-utilisateurs dès le jalon 1)
+
+- **Authentification intégrée**, sans service externe :
+  - mots de passe hachés en **argon2id** ;
+  - **jeton d'accès JWT** de courte durée (15 min) ;
+  - **jeton de rafraîchissement** dans un cookie `HttpOnly; Secure; SameSite=Strict`, révocable et stocké haché en base (`auth_session`) ;
+  - protection CSRF sur l'endpoint de rafraîchissement ;
+  - limitation des tentatives de connexion.
+- **Comptes** créés par un administrateur (pas d'inscription libre). Le premier administrateur est créé par une commande CLI à l'installation.
+- **Rôles par projet** : `owner` (gère membres et configuration), `engineer` (imports, calculs, exports), `viewer` (lecture et exports). Les administrateurs d'instance gèrent en plus les utilisateurs et les sources de données (activation des sources payantes).
+- Contrôle d'accès **appliqué côté API** (dépendance FastAPI sur chaque route), jamais seulement dans l'interface.
+- **Journal d'audit** : connexions, imports, lancements de calcul, activation de sources payantes, exports.
+- **Extension prévue** : connexion à l'annuaire de l'entreprise (LDAP / Active Directory, ou OIDC via Keycloak) sans refonte, car l'identité est isolée derrière une interface `AuthProvider`.
 - **Documentation des hypothèses et limites** : un fichier `docs/LIMITS.md` est tenu à jour à chaque jalon (interpolation temporelle, représentativité d'une maille de 13 à 28 km en terrain complexe, domaine ICON-EU, qualité de WindNinja, etc.).
 
 ---
@@ -632,39 +738,43 @@ Chaque jalon se termine par une **démonstration** (scénario reproductible dans
 
 | # | Jalon | Contenu | Démonstration |
 |---|---|---|---|
-| 1 | **Carte et points de grille** | Squelette Docker Compose, BDD et migrations, conversions CRS, saisie (formulaire, clic, CSV/KML), catalogue des modèles, recherche des points (régulière et ICON), altitude modèle vs DEM, masque terre/mer, carte MapLibre avec couches par modèle, i18n FR/EN. | Site près d'Essaouira (terrain côtier) et site près de Dakhla (ICON-EU désactivé). |
+| 1 | **Carte et points de grille** | Squelette Docker Compose, BDD et migrations, **authentification multi-utilisateurs et rôles par projet**, conversions CRS, saisie (formulaire, clic, CSV/KML), catalogue des modèles, recherche des points (régulière et ICON), altitude modèle vs DEM, masque terre/mer, carte MapLibre avec couches par modèle, i18n FR/EN. | Site près d'Essaouira (terrain côtier) et site près de Dakhla (ICON-EU désactivé). |
 | 2 | **Téléchargement des prévisions** | (2a) Open-Meteo pour le prototypage ; (2b) GRIB natifs GFS / IFS / ICON / ICON-EU ; ensembles ; harmonisation temporelle ; exports ; séries temporelles, rose des vents, comparaison ; **archiveur Celery beat**. | Téléchargement multi-modèles sur 2 points, export NetCDF, pas de 10 min marqué « interpolé ». |
 | 3 | **Import du parc et du mât** | Layout, `.wtg`/CSV, mât (CSV, TOA5, exports NRG/Windographer), contrôle qualité avec drapeaux, cisaillement et TI par secteur, MNT GLO-30, WorldCover et z0. | Parc de démonstration + mât synthétique avec gel et ombrage détectés. |
-| 4 | **PyWake et terrain** | WindNinja en conteneur, speed-ups et turning, XRSite, modèles de sillage, LUT, densité, champ de sillage sur la carte, tests IEA37 et Horns Rev. | Production brute par éolienne sur une prévision réelle, carte de sillage à 270° / 8 m/s. |
+| 4 | **PyWake et terrain** | **Import des speed-ups (format pivot + parseur natif WEng d'après votre exemple)**, repli `.rsf`/`.wrg` et WindNinja, RIX, XRSite, modèles de sillage, LUT, densité, champ de sillage sur la carte, tests IEA37 et Horns Rev. | Production brute par éolienne sur une prévision réelle, carte de sillage à 270° / 8 m/s. |
 | 5 | **Pertes et probabiliste** | Moteur de pertes, cascade, calendriers, chaîne par membre d'ensemble, quantiles, rapport PDF. | P10–P90 sur 14 jours, waterfall, PDF. |
 | 6 | **Calibration ML et évaluation** | Biais secteur × saison, quantile mapping, LightGBM quantile, pondération des modèles, métriques et skill scores, recalibration des intervalles. | Calibration sur l'historique fourni, rapport de scores par échéance. |
 
 ---
 
-## 11. Limites identifiées et décisions à valider
+## 11. Limites identifiées et journal des décisions
 
 ### Limites à connaître dès maintenant
 
 1. **Aucun modèle ouvert n'est sous-horaire sur le Maroc** : les pas de 10 et 15 min sont toujours interpolés et ne contiennent aucune variabilité physique supplémentaire.
 2. **Résolution vs terrain** : des mailles de 13 à 28 km ne résolvent ni l'Atlas, ni le Rif, ni les brises côtières. La calibration MOS au mât est indispensable ; sans mât, la prévision n'est pas « bancable ».
-3. **Pas de modèle d'écoulement « bancable » gratuit** : WAsP est payant. WindNinja est une alternative crédible mais moins validée en évaluation énergétique ; l'import de speed-ups issus de l'étude de ressource du parc est préférable.
+3. **Transposition** : elle repose sur les speed-ups WAsP Engineering importés, donc sur les limites d'un modèle linéarisé en terrain complexe (RIX). WindNinja reste le repli pour les projets sans étude WEng.
 4. **Pas d'archive ICON ouverte** : la calibration ICON dépend d'Open-Meteo ou de notre propre archiveur, qui ne capitalise qu'à partir de sa mise en service.
 5. **Formats binaires NRG et Windographer** : non lisibles, seuls les exports texte sont pris en charge.
 6. **Merchich → WGS84** : précision métrique à décamétrique selon la transformation PROJ disponible.
 7. **Pertes IEC 61400-15-2** : conçues pour du long terme, elles sont adaptées ici au court terme (calendriers, pertes dynamiques). C'est une adaptation méthodologique, pas une application normative stricte.
 
-### Décisions dont j'ai besoin de votre part
+### Journal des décisions (réponses du 2026-09-22)
 
-| # | Question | Ma recommandation |
-|---|---|---|
-| Q1 | **Usage commercial ?** L'API gratuite d'Open-Meteo l'interdit. | Si l'usage est commercial : Open-Meteo **auto-hébergé** (code libre, AGPL) ou GRIB natif uniquement ; Open-Meteo public réservé au développement. |
-| Q2 | Disposez-vous d'une **licence WAsP** ou de **speed-ups existants** (étude de ressource) ? | Import de speed-ups existants s'ils sont disponibles ; sinon WindNinja. |
-| Q3 | Quelle **profondeur d'historique** mât/SCADA existe pour la calibration, et avec quels formats de fichiers (exemples) ? | ≥ 12 mois, au pas de 10 min. |
-| Q4 | Nombre d'éoliennes par parc, nombre de parcs et d'utilisateurs simultanés ? | Sert au dimensionnement du worker de calcul et au choix LUT vs direct. |
-| Q5 | Authentification multi-utilisateurs nécessaire dès le départ ? | Jeton simple au jalon 1, OIDC (Keycloak, libre) plus tard si besoin. |
-| Q6 | Accès à l'**IFS 0,1°** : faut-il investiguer l'offre ECMWF 2025 en détail au jalon 2, quitte à accepter des frais de service ? | Investiguer, mais rester à 0,25° si ce n'est pas gratuit. |
-| Q7 | Déploiement cible : serveur interne, cloud, poste unique ? | Docker Compose sur un serveur Linux, 8 vCPU / 32 Go minimum pour ICON global et les ensembles. |
+| # | Question | Décision | Impact sur l'architecture |
+|---|---|---|---|
+| Q1 | Usage commercial ? | **Usage interne non commercial** au départ ; possibilité de passer au commercial | `DEPLOYMENT_USAGE=internal`. Open-Meteo public est autorisé. Le passage au commercial se fait par configuration (Open-Meteo `api_key` ou `self_hosted`) (§4.3.5). |
+| Q2 | Licence WAsP / speed-ups ? | **Licence WAsP disponible, speed-ups produits avec WAsP Engineering** | Import des speed-ups WEng comme voie principale ; WindNinja en repli (§5.3). **Format d'import spécifié en §5.3.3.** |
+| Q3 | Historique de calibration | **≥ 12 mois, en CSV** | Priorité à l'import CSV générique avec correspondance de colonnes ; les parseurs NRG/Campbell passent au second plan. |
+| Q4 | Taille des parcs | **59 à 400 MW** selon le projet | ~15 à 130 éoliennes. Mode LUT par défaut ; mode direct découpé en blocs de temps ; objectif mesuré au jalon 4 : une prévision de 14 j × 51 membres pour 400 MW en moins de 15 min sur le serveur recommandé. |
+| Q5 | Authentification | **Multi-utilisateurs dès le départ** | Intégrée au jalon 1, rôles par projet, audit (§8.1). |
+| Q6 | IFS 0,1° / services payants | **Gratuit au départ** ; l'utilisateur décide de commander ou non un service payant | Sources `paid` désactivées par défaut, activation par un administrateur puis choix explicite de l'utilisateur, tracés dans le run (§4.3.5). |
+| Q7 | Déploiement | **Serveur local** | Docker Compose, HTTPS interne, proxy sortant, sauvegardes, 16 vCPU / 64 Go recommandés (§2.5). |
 
----
+### Ce dont j'aurai besoin plus tard (sans bloquer le jalon 1)
 
-*Après validation (éventuellement amendée), je démarre le jalon 1.*
+- **Jalon 3** : un extrait de CSV mât (quelques jours, anonymisé si besoin) et un `.wtg` représentatif.
+- **Jalon 4** : un **export natif WAsP Engineering** (tableau de résultats par point et par direction), pour écrire son parseur.
+- **Déploiement** : le nom d'hôte interne et le certificat, ou l'accord pour une CA interne générée par Caddy.
+
+*Dès votre validation de cette v0.2, je démarre le jalon 1.*
