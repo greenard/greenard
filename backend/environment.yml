@@ -20,4 +20,5 @@ dependencies:
   - psycopg>=3.1
   - tzdata>=2026d        # fuseaux IANA à jour (Maroc : passage à UTC+0 le 20/09/2026)
   - openpyxl
+  - pyarrow
   - pip

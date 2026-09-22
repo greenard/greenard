@@ -225,3 +225,86 @@ def archive_runs() -> dict:
                     )
                     created.append(job.id)
     return {"jobs": created}
+
+
+def project_points(db, project_id: int) -> list[tuple[float, float]]:
+    from sqlalchemy import select
+
+    from app.db.models import MetMast, Site, Turbine, WindFarm
+
+    pts = [(t.lat, t.lon) for t in db.scalars(select(Turbine).join(WindFarm).where(WindFarm.project_id == project_id))]
+    pts += [(m.lat, m.lon) for m in db.scalars(select(MetMast).where(MetMast.project_id == project_id))]
+    if not pts:  # à défaut : les sites de prévision
+        pts = [(s.lat, s.lon) for s in db.scalars(select(Site).where(Site.project_id == project_id))]
+    return pts
+
+
+@celery_app.task(name="app.tasks.jobs.terrain_download")
+def terrain_download(task_id: int, project_id: int, kind: str, margin_km: float) -> None:
+    from pathlib import Path
+
+    from app.db.models import TerrainLayer
+    from app.terrain import rasters
+
+    try:
+        progress = _progress_writer(task_id)
+        with SessionLocal() as db:
+            bbox = rasters.extent(project_points(db, project_id), margin_km)
+            progress(0.05, "extent")
+            if kind == "dem":
+                layer = TerrainLayer(
+                    project_id=project_id,
+                    kind="dem",
+                    name="Copernicus DEM GLO-30",
+                    source="copernicus_glo30",
+                    file_uri="",
+                    crs="EPSG:4326",
+                    bbox=list(bbox),
+                    resolution_m=30.0,
+                )
+                db.add(layer)
+                db.flush()
+                out = rasters.terrain_dir(project_id) / f"dem_{layer.id}.tif"
+                layer.stats = rasters.download_dem(bbox, out) | {"margin_km": margin_km}
+                layer.file_uri = str(out)
+                result = {"layers": [layer.id]}
+            else:
+                lc = TerrainLayer(
+                    project_id=project_id,
+                    kind="landcover",
+                    name="ESA WorldCover 10 m (2021, v200)",
+                    source="esa_worldcover",
+                    file_uri="",
+                    crs="EPSG:4326",
+                    bbox=list(bbox),
+                    resolution_m=10.0,
+                    z0_table=rasters.DEFAULT_Z0,
+                )
+                db.add(lc)
+                db.flush()
+                out = rasters.terrain_dir(project_id) / f"landcover_{lc.id}.tif"
+                lc.stats = rasters.download_landcover(bbox, out) | {"margin_km": margin_km}
+                lc.file_uri = str(out)
+                progress(0.7, "z0")
+                rough = TerrainLayer(
+                    project_id=project_id,
+                    kind="roughness",
+                    name="z0 (ESA WorldCover)",
+                    source="esa_worldcover",
+                    file_uri="",
+                    crs="EPSG:4326",
+                    bbox=list(bbox),
+                    resolution_m=10.0,
+                    z0_table=rasters.DEFAULT_Z0,
+                )
+                db.add(rough)
+                db.flush()
+                zout = rasters.terrain_dir(project_id) / f"z0_{rough.id}.tif"
+                rough.stats = rasters.z0_from_landcover(Path(out), rasters.DEFAULT_Z0, zout)
+                rough.file_uri = str(zout)
+                result = {"layers": [lc.id, rough.id]}
+            db.commit()
+        _finish(task_id, "success", "ok", result)
+    except Exception as exc:  # noqa: BLE001
+        log.error("terrain_download failed: %s\n%s", exc, traceback.format_exc())
+        _finish(task_id, "failure", str(exc), _error_payload(exc))

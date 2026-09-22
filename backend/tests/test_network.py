@@ -83,3 +83,22 @@ def test_icon_global_real():
         )
         ds = src.fetch(c, req, lambda p, m: None)
     assert "u_100m" in ds and ds.attrs.get("derived_heights_m") == "100"
+
+
+# ---- terrain (jalon 3) ------------------------------------------------------------------------------
+
+
+def test_dem_and_worldcover_real(tmp_path):
+    from app.terrain import rasters
+
+    bbox = rasters.extent([(31.45, -9.72)], 3.0)
+    info = rasters.download_dem(bbox, tmp_path / "dem.tif")
+    assert info["width"] > 150 and -50 < info["min_m"] < info["max_m"] < 1500
+    lc = rasters.download_landcover(bbox, tmp_path / "lc.tif")
+    assert sum(lc["classes_pct"].values()) > 99
+    z = rasters.z0_from_landcover(tmp_path / "lc.tif", rasters.DEFAULT_Z0, tmp_path / "z0.tif")
+    assert z["unmapped_classes"] == []
+    sectors = rasters.z0_by_sector(tmp_path / "z0.tif", 31.45, -9.72)
+    assert len(sectors) == 12
+    png, bounds = rasters.hillshade_png(tmp_path / "dem.tif")
+    assert png[:4] == b"\x89PNG"

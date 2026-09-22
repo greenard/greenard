@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, forecasts, geo, models, projects, sites, tasks, users
+from app.api.routes import auth, farm, forecasts, geo, mast, models, projects, sites, tasks, terrain, users
 from app.core.config import get_settings
 from app.core.errors import AppError, app_error_handler
 
@@ -22,7 +22,7 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-    for r in (auth, users, projects, sites, geo, models, tasks, forecasts):
+    for r in (auth, users, projects, sites, geo, models, tasks, forecasts, farm, mast, terrain):
         app.include_router(r.router, prefix=API_PREFIX)
 
     @app.get(f"{API_PREFIX}/health", tags=["health"])

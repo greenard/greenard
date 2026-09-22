@@ -18,6 +18,7 @@ celery_app.conf.update(
         "app.tasks.jobs.compute_grid_points": {"queue": "io"},
         "app.tasks.jobs.download_forecasts": {"queue": "io"},
         "app.tasks.jobs.archive_runs": {"queue": "io"},
+        "app.tasks.jobs.terrain_download": {"queue": "io"},
     },
     beat_schedule={
         "archive-runs": {

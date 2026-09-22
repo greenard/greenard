@@ -258,3 +258,148 @@ class ForecastExtract(Base):
 
     job: Mapped[ForecastJob] = relationship(back_populates="extracts")
     run: Mapped[NwpRun | None] = relationship()
+
+
+# --------------------------------------------------------------------------------------------
+# Jalon 3 : parc, éoliennes, mât, terrain
+# --------------------------------------------------------------------------------------------
+
+
+class TurbineType(Base):
+    __tablename__ = "turbine_type"
+    __table_args__ = (UniqueConstraint("project_id", "name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    manufacturer: Mapped[str] = mapped_column(String(200), default="")
+    rotor_d_m: Mapped[float] = mapped_column(Float)
+    rated_kw: Mapped[float] = mapped_column(Float)
+    hub_heights_m: Mapped[list[float]] = mapped_column(JSONType, default=list)
+    rho_ref: Mapped[float] = mapped_column(Float, default=1.225)
+    cut_in_ms: Mapped[float] = mapped_column(Float)
+    cut_out_ms: Mapped[float] = mapped_column(Float)
+    restart_ms: Mapped[float | None] = mapped_column(Float)  # hystérésis haut vent
+    # [{ws, power_kw, ct}] à la densité de référence
+    power_curve: Mapped[list[dict[str, float]]] = mapped_column(JSONType, default=list)
+    # [{rho, points: [{ws, power_kw, ct}]}] si le fichier contient plusieurs densités
+    density_curves: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, default=list)
+    # [{t_c, max_kw}] déclassement haute température (facultatif)
+    temp_derating: Mapped[list[dict[str, float]]] = mapped_column(JSONType, default=list)
+    source_format: Mapped[str] = mapped_column(String(16), default="")
+    source_filename: Mapped[str] = mapped_column(String(300), default="")
+    file_hash: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class WindFarm(Base):
+    __tablename__ = "wind_farm"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    is_neighbour: Mapped[bool] = mapped_column(Boolean, default=False)
+    layout_filename: Mapped[str] = mapped_column(String(300), default="")
+    layout_hash: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    turbines: Mapped[list["Turbine"]] = relationship(
+        back_populates="farm", cascade="all, delete-orphan", order_by="Turbine.label"
+    )
+
+
+class Turbine(Base):
+    __tablename__ = "turbine"
+    __table_args__ = (UniqueConstraint("farm_id", "label"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    farm_id: Mapped[int] = mapped_column(ForeignKey("wind_farm.id", ondelete="CASCADE"), index=True)
+    label: Mapped[str] = mapped_column(String(64))
+    lat: Mapped[float] = mapped_column(Float)
+    lon: Mapped[float] = mapped_column(Float)
+    geom = mapped_column(Geometry("POINT", srid=4326, spatial_index=True))
+    input_crs: Mapped[str] = mapped_column(String(32), default="EPSG:4326")
+    input_x: Mapped[float | None] = mapped_column(Float)
+    input_y: Mapped[float | None] = mapped_column(Float)
+    hub_height_m: Mapped[float] = mapped_column(Float)
+    type_id: Mapped[int] = mapped_column(ForeignKey("turbine_type.id", ondelete="RESTRICT"))
+    dem_elevation_m: Mapped[float | None] = mapped_column(Float)
+
+    farm: Mapped[WindFarm] = relationship(back_populates="turbines")
+    type: Mapped[TurbineType] = relationship()
+
+
+class MetMast(Base):
+    __tablename__ = "met_mast"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    lat: Mapped[float] = mapped_column(Float)
+    lon: Mapped[float] = mapped_column(Float)
+    geom = mapped_column(Geometry("POINT", srid=4326, spatial_index=True))
+    input_crs: Mapped[str] = mapped_column(String(32), default="EPSG:4326")
+    input_x: Mapped[float | None] = mapped_column(Float)
+    input_y: Mapped[float | None] = mapped_column(Float)
+    elevation_m: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    sensors: Mapped[list["MastSensor"]] = relationship(
+        back_populates="mast", cascade="all, delete-orphan", order_by="MastSensor.height_m"
+    )
+    datasets: Mapped[list["MastDataset"]] = relationship(back_populates="mast", cascade="all, delete-orphan")
+
+
+class MastSensor(Base):
+    """Capteur : grandeur (ws, wd, temp, rh, pressure) à une hauteur, avec l'orientation du bras."""
+
+    __tablename__ = "mast_sensor"
+    __table_args__ = (UniqueConstraint("mast_id", "code"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mast_id: Mapped[int] = mapped_column(ForeignKey("met_mast.id", ondelete="CASCADE"), index=True)
+    code: Mapped[str] = mapped_column(String(64))  # ex. ws_100_n, wd_97
+    kind: Mapped[str] = mapped_column(String(16))  # ws | wd | temp | rh | pressure
+    height_m: Mapped[float] = mapped_column(Float)
+    boom_dir_deg: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str] = mapped_column(String(16), default="")
+
+    mast: Mapped[MetMast] = relationship(back_populates="sensors")
+
+
+class MastDataset(Base):
+    __tablename__ = "mast_dataset"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mast_id: Mapped[int] = mapped_column(ForeignKey("met_mast.id", ondelete="CASCADE"), index=True)
+    original_filename: Mapped[str] = mapped_column(String(300))
+    format: Mapped[str] = mapped_column(String(32))
+    mapping: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    time_reference: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    file_uri: Mapped[str] = mapped_column(String(500))
+    file_hash: Mapped[str] = mapped_column(String(64))
+    t_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    t_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    n_records: Mapped[int] = mapped_column(Integer, default=0)
+    qc_summary: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    mast: Mapped[MetMast] = relationship(back_populates="datasets")
+
+
+class TerrainLayer(Base):
+    __tablename__ = "terrain_layer"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # dem | landcover | roughness | roughness_map
+    name: Mapped[str] = mapped_column(String(200))
+    source: Mapped[str] = mapped_column(String(64))  # copernicus_glo30 | esa_worldcover | upload | wasp_map
+    file_uri: Mapped[str] = mapped_column(String(500))
+    crs: Mapped[str] = mapped_column(String(64), default="")
+    resolution_m: Mapped[float | None] = mapped_column(Float)
+    bbox: Mapped[list[float]] = mapped_column(JSONType, default=list)  # lon_min, lat_min, lon_max, lat_max
+    z0_table: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    stats: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
