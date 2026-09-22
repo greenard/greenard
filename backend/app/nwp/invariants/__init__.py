@@ -50,6 +50,8 @@ def meta_path(model_code: str) -> Path:
 
 
 def status(model_code: str) -> dict:
+    if not get_model(_source_code(model_code)).invariants:
+        return {"ready": False, "unavailable": True}
     mp = meta_path(model_code)
     if cache_path(model_code).exists() and mp.exists():
         return {"ready": True, **json.loads(mp.read_text())}

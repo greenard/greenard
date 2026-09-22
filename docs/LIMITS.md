@@ -95,3 +95,9 @@ Document tenu à jour à chaque jalon (§8 de la note d'architecture).
 - Le Maroc est revenu à **UTC+0** le 20/09/2026 (tzdata 2026d). L'heure locale est calculée côté
   serveur. Seules les dates de création affichées dans l'interface utilisent la base de fuseaux du
   navigateur.
+
+### IFS 9 km (Open-Meteo)
+- Modèle `ifs_9km` sur la grille native O1280, servi uniquement par Open-Meteo (API publique non
+  commerciale en mode `public`). Altitude modèle et terre/mer non affichées pour cette grille.
+- Correctif : le calendrier des échéances natives utilisé pour filtrer Open-Meteo sautait d'un pas
+  aux transitions (ex. GFS 121 h au lieu de 123 h, IFS 147 h au lieu de 150 h) ; corrigé et testé.

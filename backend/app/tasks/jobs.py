@@ -58,6 +58,8 @@ def gridpoints_domain_blocked(code: str, site_id: int) -> bool:
 
 def ensure_invariants(code: str, progress: Callable[[float, str], None]) -> None:
     source = INVARIANTS_FROM.get(code, code)
+    if source not in fetch.FETCHERS:
+        return  # grille sans champs invariants téléchargeables (ex. IFS 9 km O1280)
     if not invariants.status(source)["ready"]:
         fetch.prepare(source, progress)
 

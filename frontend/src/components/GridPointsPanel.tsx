@@ -105,7 +105,13 @@ export default function GridPointsPanel({ site, models, canEdit, visible, setVis
                 👁
               </label>
               <small className="muted">
-                {m.milestone > 1 ? t("grid.milestone2") : m.invariants_status.ready ? t("grid.invariantsReady") : t("grid.invariantsMissing")}
+                {m.milestone > 1
+                  ? t("grid.milestone2")
+                  : m.invariants_status.ready
+                    ? t("grid.invariantsReady")
+                    : m.invariants_status.unavailable
+                      ? t("grid.invariantsUnavailable")
+                      : t("grid.invariantsMissing")}
               </small>
               {off && <div className="alert warning small">{codeText(t, a.message_code, a.params)}</div>}
             </div>

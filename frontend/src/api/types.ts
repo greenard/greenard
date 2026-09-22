@@ -74,7 +74,7 @@ export interface ModelInfo {
   code: string;
   name: string;
   provider: string;
-  grid_type: "regular" | "icosahedral";
+  grid_type: "regular" | "icosahedral" | "reduced_gaussian";
   resolution: string;
   color: string;
   regional: boolean;
@@ -83,7 +83,7 @@ export interface ModelInfo {
   milestone: number;
   notes: string;
   domain?: { lat_min: number; lat_max: number; lon_min: number; lon_max: number };
-  invariants_status: { ready: boolean; prepared_at?: string; source?: unknown };
+  invariants_status: { ready: boolean; unavailable?: boolean; prepared_at?: string; source?: unknown };
 }
 
 export interface Availability {

@@ -24,6 +24,7 @@ PREFERENCE = {
     "gfs": ["nomads", "aws", "open_meteo"],
     "gefs": ["nomads", "open_meteo", "aws"],
     "ifs": ["aws", "ecmwf", "open_meteo"],
+    "ifs_9km": ["open_meteo"],
     "ens": ["open_meteo", "aws", "ecmwf"],
     "icon": ["dwd", "open_meteo"],
     "icon_eu": ["dwd", "open_meteo"],

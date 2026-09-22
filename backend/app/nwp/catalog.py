@@ -23,6 +23,7 @@ class ModelSpec:
     color: str  # couleur de la couche carte
     regular_grid: RegularGrid | None = None
     icon_grid_name: str | None = None
+    gaussian_n: int | None = None  # grille de Gauss réduite octaédrique (O<n>)
     regional: bool = False
     # Paliers (échéance max h, pas natif h) par run
     native_steps: dict[str, list[tuple[int, int]]] = field(default_factory=dict)
@@ -88,6 +89,20 @@ MODELS: dict[str, ModelSpec] = {
         wind_heights_m=(10, 100),
         invariants="z (sfc) / g, lsm (step 0)",
         notes="0.1° native resolution is a paid/optional source (see §4.3.5).",
+    ),
+    "ifs_9km": ModelSpec(
+        code="ifs_9km",
+        name="ECMWF IFS 9 km (Open-Meteo)",
+        provider="ECMWF via Open-Meteo",
+        grid_type="reduced_gaussian",
+        resolution="~9 km (O1280)",
+        color="#9e0142",
+        gaussian_n=1280,
+        native_steps={"00/12": [(90, 1), (144, 3), (360, 6)], "06/18": [(90, 1), (144, 3)]},
+        wind_heights_m=(10, 100),
+        invariants="",
+        notes="Native O1280 grid served by Open-Meteo (CC-BY 4.0 ECMWF open data). Model orography "
+        "and land-sea mask are not available for this grid in the application yet.",
     ),
     "icon": ModelSpec(
         code="icon",
@@ -167,8 +182,8 @@ def native_leads(code: str, run_hour: int, max_lead_h: int | None = None) -> lis
             schedule = steps
     if schedule is None:
         schedule = next(iter(spec.native_steps.values()))
-    leads, start = [], 0
+    leads: list[int] = []
     for until, step in schedule:
+        start = leads[-1] + step if leads else 0
         leads += list(range(start, until + 1, step))
-        start = leads[-1] + step
     return [h for h in leads if max_lead_h is None or h <= max_lead_h]

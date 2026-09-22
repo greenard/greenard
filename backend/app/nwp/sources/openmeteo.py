@@ -37,6 +37,7 @@ from app.nwp.wind import speed_dir_to_uv
 MODELS = {
     "gfs": ("gfs_global", "ncep_gfs025", 4),
     "ifs": ("ecmwf_ifs025", "ecmwf_ifs025", 7),
+    "ifs_9km": ("ecmwf_ifs", "ecmwf_ifs", 7),
     "icon": ("icon_global", "dwd_icon", 4),
     "icon_eu": ("icon_eu", "dwd_icon_eu", 4),
     "gefs": ("gfs025", "ncep_gefs025", 6),
@@ -44,6 +45,7 @@ MODELS = {
 }
 ENSEMBLES = {"gefs", "ens"}
 RUN_HOURS = {
+    "ifs_9km": (0, 6, 12, 18),
     "gfs": (0, 6, 12, 18),
     "gefs": (0, 6, 12, 18),
     "ifs": (0, 6, 12, 18),

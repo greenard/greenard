@@ -121,7 +121,8 @@
     "selectedCount": "{{count}} point(s) sélectionné(s)",
     "index": "Index natif",
     "taskFailed": "Échec du calcul",
-    "warning": "Avertissement"
+    "warning": "Avertissement",
+    "invariantsUnavailable": "altitude / terre-mer du modèle non disponibles"
   },
   "map": {
     "basemap": "Fond de carte",
@@ -219,7 +220,8 @@
     "SOURCE_DISABLED": "Source désactivée par un administrateur.",
     "SOURCE_NON_COMMERCIAL": "Source réservée à un usage non commercial : refusée en déploiement commercial.",
     "SOURCE_PAID_NOT_ACCEPTED": "Source payante : cochez l'acceptation explicite.",
-    "OPEN_METEO_NOT_CONFIGURED": "Open-Meteo n'est pas configuré (clé ou URL manquante)."
+    "OPEN_METEO_NOT_CONFIGURED": "Open-Meteo n'est pas configuré (clé ou URL manquante).",
+    "INVARIANTS_UNAVAILABLE": "Altitude et masque terre/mer du modèle non disponibles pour cette grille."
   },
   "fc": {
     "tab": "Prévisions",

@@ -121,7 +121,8 @@
     "selectedCount": "{{count}} point(s) selected",
     "index": "Native index",
     "taskFailed": "Computation failed",
-    "warning": "Warning"
+    "warning": "Warning",
+    "invariantsUnavailable": "model elevation / land-sea not available"
   },
   "map": {
     "basemap": "Basemap",
@@ -219,7 +220,8 @@
     "SOURCE_DISABLED": "Source disabled by an administrator.",
     "SOURCE_NON_COMMERCIAL": "Non-commercial source: refused in a commercial deployment.",
     "SOURCE_PAID_NOT_ACCEPTED": "Paid source: tick the explicit acceptance.",
-    "OPEN_METEO_NOT_CONFIGURED": "Open-Meteo is not configured (missing key or URL)."
+    "OPEN_METEO_NOT_CONFIGURED": "Open-Meteo is not configured (missing key or URL).",
+    "INVARIANTS_UNAVAILABLE": "Model elevation and land-sea mask are not available for this grid."
   },
   "fc": {
     "tab": "Forecasts",

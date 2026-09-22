@@ -23,8 +23,17 @@ service payant.
 | Sous-ensemble ouvert 9 km de l'ECMWF | gratuit | quand l'ECMWF le publiera | Même adaptateur que l'open data 0,25°, avec une grille différente et des fichiers plus lourds. |
 | Service ECMWF (livraison sur contrat) | frais de service | commande et contrat | Source `ecmwf_hres_01` déjà prévue : désactivée, activation par un administrateur, acceptation explicite à chaque demande. |
 
-**Recommandation** : ajouter l'IFS 9 km via Open-Meteo (usage interne), puis basculer sur le flux
-ouvert de l'ECMWF dès sa publication. Aucun service payant n'est nécessaire à ce stade.
+**Décision (22/09/2026)** : IFS 9 km via Open-Meteo **implémenté** (modèle `ifs_9km`). Bascule prévue
+vers le flux ouvert ECMWF 9 km dès sa publication ; aucun service payant commandé.
+
+### Mise en œuvre
+- Grille native **O1280** (Gauss réduite octaédrique, 6 599 680 points) : recherche des 4 points
+  encadrants (2 sur la rangée nord, 2 sur la rangée sud) ou des N plus proches, index natif GRIB.
+- Téléchargement via Open-Meteo `models=ecmwf_ifs`, `cell_selection=nearest`, sans correction
+  d'altitude ; échéances natives conservées : horaire jusqu'à 90 h, 3-horaire jusqu'à 144 h, puis
+  6-horaire (calendrier à confirmer sur les runs 06/18).
+- **Limite** : altitude du modèle et masque terre/mer non disponibles pour cette grille dans
+  l'application (champs invariants O1280 non publiés en open data à ce jour).
 
 Sources : annonce ECMWF « ECMWF makes its entire Real-time Catalogue open to all » (2025), page
 dataset « IFS Medium-range Control forecast (set I) », documentation Open-Meteo « ECMWF API ».

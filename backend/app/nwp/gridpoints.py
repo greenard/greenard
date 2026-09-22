@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from geoalchemy2.elements import WKTElement
 from sqlalchemy import select
@@ -14,10 +15,16 @@ from app.db.models import GridPoint, Site, SiteGridPoint
 from app.geo.geodesy import distance_azimuth
 from app.nwp import invariants
 from app.nwp.catalog import get_model
+from app.nwp.grids.gaussian import ReducedGaussianGrid
 from app.nwp.grids.regular import RegularGrid
 from app.terrain import dem
 
 ALLOWED_N = (4, 9, 16)
+
+
+@lru_cache(maxsize=2)
+def _gaussian(n: int) -> ReducedGaussianGrid:
+    return ReducedGaussianGrid(n)
 
 
 @dataclass
@@ -125,6 +132,35 @@ def find_candidates(code: str, lat: float, lon: float, n: int = 4, method: str =
         if inv is None:
             res.message_code = "INVARIANTS_NOT_READY"
         return res
+
+    if spec.grid_type == "reduced_gaussian":
+        grid = _gaussian(spec.gaussian_n)
+        if method == "bracket":
+            rc = grid.bracketing(lat, lon)
+            lats = [float(grid.lats[r]) for r, _ in rc]
+            lons = [grid.lon_of(r, j) for r, j in rc]
+            dist, az = distance_azimuth(lat, lon, lats, lons)
+            rows = [(r, j, float(d), float(a)) for (r, j), d, a in zip(rc, dist, az, strict=True)]
+            rows.sort(key=lambda x: (round(x[2], 3), grid.native_index(x[0], x[1])))
+        else:
+            rows = grid.nearest(lat, lon, n)
+        half = (0.035, 0.045)  # ~ demi-maille O1280 (~7,8 km en latitude)
+        cands = [
+            Candidate(
+                grid.native_index(r, j),
+                r,
+                j,
+                float(grid.lats[r]),
+                grid.lon_of(r, j),
+                d,
+                a,
+                None,
+                None,
+                cell_half_deg=half,
+            )
+            for r, j, d, a in rows
+        ]
+        return ModelResult(code, "ok", method=method, candidates=cands, message_code="INVARIANTS_UNAVAILABLE")
 
     # Grille icosaédrique : pas de notion de maille encadrante, on retient les n plus proches
     # cellules (et la cellule contenant le site si les sommets sont connus).
