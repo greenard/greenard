@@ -109,3 +109,117 @@ def compute_grid_points(task_id: int, site_id: int, models: list[str], n: int, m
     except Exception as exc:  # noqa: BLE001
         log.error("compute_grid_points failed: %s\n%s", exc, traceback.format_exc())
         _finish(task_id, "failure", str(exc), _error_payload(exc) | {"warnings": warnings})
+
+
+@celery_app.task(name="app.tasks.jobs.download_forecasts")
+def download_forecasts(task_id: int, job_id: int) -> None:
+    from app.db.models import ForecastJob
+    from app.forecasts.service import run_job
+
+    try:
+        with SessionLocal() as db:
+            job = db.get(ForecastJob, job_id)
+            if job is None:
+                raise AppError("FORECAST_JOB_NOT_FOUND", "Job not found", status_code=404)
+            job.status = "running"
+            db.commit()
+            run_job(db, job, _progress_writer(task_id))
+            ok = sum(e.status == "success" for e in job.extracts)
+            job.status = "success" if ok == len(job.extracts) else ("partial" if ok else "failure")
+            db.commit()
+            summary = {
+                "job_id": job.id,
+                "status": job.status,
+                "models": [{"model": e.model_code, "status": e.status, "source": e.source} for e in job.extracts],
+            }
+        _finish(task_id, "success" if ok else "failure", "ok" if ok else "all models failed", summary)
+    except Exception as exc:  # noqa: BLE001
+        log.error("download_forecasts failed: %s\n%s", exc, traceback.format_exc())
+        with SessionLocal() as db:
+            from app.db.models import ForecastJob
+
+            job = db.get(ForecastJob, job_id)
+            if job is not None:
+                job.status = "failure"
+                db.commit()
+        _finish(task_id, "failure", str(exc), _error_payload(exc))
+
+
+@celery_app.task(name="app.tasks.jobs.archive_runs")
+def archive_runs() -> dict:
+    """Archivage automatique : pour chaque projet activé, télécharge les nouveaux runs sur les points
+    sélectionnés des sites (le DWD ne conserve que ~24 h ; base de la calibration du jalon 6)."""
+    from sqlalchemy import select
+
+    from app.db.models import ForecastExtract, ForecastJob, NwpRun, Project, SiteGridPoint
+    from app.forecasts.service import default_params, run_job
+    from app.nwp.sources.base import http_client
+    from app.nwp.sources.registry import get_source, sources_for
+
+    created = []
+    with SessionLocal() as db:
+        projects = list(db.scalars(select(Project).where(Project.archive_enabled.is_(True))))
+        for project in projects:
+            for site in project.sites:
+                for model in project.archive_models or []:
+                    selected = db.scalar(
+                        select(SiteGridPoint).where(
+                            SiteGridPoint.site_id == site.id,
+                            SiteGridPoint.model_code == model,
+                            SiteGridPoint.selected.is_(True),
+                        )
+                    )
+                    if selected is None:
+                        continue
+                    # run le plus récent disponible sur la source préférée
+                    latest = None
+                    for code in sources_for(model):
+                        try:
+                            with http_client() as c:
+                                latest = get_source(model, code).latest_run(c)
+                            break
+                        except Exception:  # noqa: BLE001
+                            continue
+                    if latest is None:
+                        continue
+                    done = db.scalar(
+                        select(ForecastExtract.id)
+                        .join(NwpRun)
+                        .join(ForecastJob)
+                        .where(
+                            ForecastJob.site_id == site.id,
+                            NwpRun.model_code == model,
+                            NwpRun.init_time == latest,
+                            ForecastExtract.status == "success",
+                        )
+                    )
+                    if done:
+                        continue
+                    params = default_params(
+                        models=[model], run=latest.isoformat(), max_lead_h=project.archive_max_lead_h
+                    )
+                    task = TaskLog(kind="archive_runs", project_id=project.id, message=f"{model} {latest:%Y-%m-%d %HZ}")
+                    db.add(task)
+                    db.flush()
+                    job = ForecastJob(
+                        project_id=project.id,
+                        site_id=site.id,
+                        kind="archive",
+                        params=params,
+                        status="running",
+                        task_id=task.id,
+                    )
+                    db.add(job)
+                    db.commit()
+                    try:
+                        run_job(db, job, _progress_writer(task.id))
+                        job.status = "success" if all(e.status == "success" for e in job.extracts) else "failure"
+                    except Exception as exc:  # noqa: BLE001
+                        log.error("archive failed: %s", exc)
+                        job.status = "failure"
+                    db.commit()
+                    _finish(
+                        task.id, "success" if job.status == "success" else "failure", job.status, {"job_id": job.id}
+                    )
+                    created.append(job.id)
+    return {"jobs": created}

@@ -16,5 +16,13 @@ celery_app.conf.update(
     task_routes={
         "app.tasks.jobs.prepare_invariants": {"queue": "io"},
         "app.tasks.jobs.compute_grid_points": {"queue": "io"},
+        "app.tasks.jobs.download_forecasts": {"queue": "io"},
+        "app.tasks.jobs.archive_runs": {"queue": "io"},
+    },
+    beat_schedule={
+        "archive-runs": {
+            "task": "app.tasks.jobs.archive_runs",
+            "schedule": settings.archive_interval_min * 60.0,
+        },
     },
 )

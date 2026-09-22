@@ -50,6 +50,10 @@ services:
     <<: *backend
     command: celery -A app.tasks.celery_app worker -Q io,celery -c 4 --loglevel=INFO
 
+  beat:
+    <<: *backend
+    command: celery -A app.tasks.celery_app beat --loglevel=INFO --schedule /data/celerybeat-schedule
+
   # Jalons 4+ : file "compute" (PyWake, WindNinja) — concurrence limitée au nombre de cœurs.
   # worker-compute:
   #   <<: *backend

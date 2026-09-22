@@ -11,16 +11,15 @@ import bz2
 import json
 import logging
 import re
-import tempfile
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
-import eccodes
 import httpx
 import numpy as np
 
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.nwp.grib import decode_grib, regular_from_message  # noqa: F401  (réexport)
 from app.nwp.grids.icosahedral import IcosahedralGrid
 from app.nwp.grids.regular import RegularGrid
 from app.nwp.invariants import (
@@ -55,68 +54,6 @@ def _get(client: httpx.Client, url: str, headers: dict | None = None) -> httpx.R
     except httpx.HTTPError as exc:
         raise SourceUnavailable("SOURCE_UNREACHABLE", f"Cannot reach {url}: {exc}", url=url) from exc
     return r
-
-
-# --------------------------------------------------------------------------------------------
-# Décodage GRIB
-# --------------------------------------------------------------------------------------------
-
-
-def decode_grib(data: bytes) -> list[dict]:
-    """Décode tous les messages GRIB d'un tampon mémoire."""
-    out = []
-    with tempfile.NamedTemporaryFile(suffix=".grib2") as tmp:
-        tmp.write(data)
-        tmp.flush()
-        with open(tmp.name, "rb") as fh:
-            while True:
-                gid = eccodes.codes_grib_new_from_file(fh)
-                if gid is None:
-                    break
-                try:
-                    msg = {
-                        "shortName": eccodes.codes_get(gid, "shortName"),
-                        "gridType": eccodes.codes_get(gid, "gridType"),
-                        "values": eccodes.codes_get_values(gid).astype(float),
-                    }
-                    if eccodes.codes_get(gid, "bitmapPresent"):
-                        miss = eccodes.codes_get(gid, "missingValue")
-                        msg["values"][msg["values"] == miss] = np.nan
-                    if msg["gridType"] == "regular_ll":
-                        for k in ("Ni", "Nj", "jScansPositively", "iScansNegatively"):
-                            msg[k] = eccodes.codes_get(gid, k)
-                        for k in (
-                            "latitudeOfFirstGridPointInDegrees",
-                            "longitudeOfFirstGridPointInDegrees",
-                            "iDirectionIncrementInDegrees",
-                            "jDirectionIncrementInDegrees",
-                        ):
-                            msg[k] = eccodes.codes_get_double(gid, k)
-                    out.append(msg)
-                finally:
-                    eccodes.codes_release(gid)
-    return out
-
-
-def regular_from_message(msg: dict) -> tuple[RegularGrid, np.ndarray]:
-    """Géométrie et champ 2D (ordre du fichier) d'un message regular_ll."""
-    if msg["gridType"] != "regular_ll":
-        raise ValueError(f"Unexpected grid type {msg['gridType']}")
-    if msg["iScansNegatively"]:
-        raise ValueError("iScansNegatively=1 is not supported")
-    ni, nj = int(msg["Ni"]), int(msg["Nj"])
-    dlon = float(msg["iDirectionIncrementInDegrees"])
-    dlat = float(msg["jDirectionIncrementInDegrees"]) * (1 if msg["jScansPositively"] else -1)
-    grid = RegularGrid(
-        lat_first=float(msg["latitudeOfFirstGridPointInDegrees"]),
-        dlat=dlat,
-        nlat=nj,
-        lon_first=float(msg["longitudeOfFirstGridPointInDegrees"]),
-        dlon=dlon,
-        nlon=ni,
-        global_lon=abs(ni * dlon - 360.0) < 1e-6,
-    )
-    return grid, np.asarray(msg["values"]).reshape(nj, ni)
 
 
 # --------------------------------------------------------------------------------------------

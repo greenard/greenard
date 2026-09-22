@@ -2,7 +2,7 @@
 
 > Application web de prévision météorologique (Module A « Météo ») et de prévision de production éolienne (Module B « Énergie »).
 >
-> Version 0.3 — 2026-09-22 — v0.2 validée ; mises à jour issues du jalon 1 (voir « Écarts constatés au jalon 1 » en §11).
+> Version 0.4 — 2026-09-22 — mises à jour issues des jalons 1 et 2 (voir « Écarts constatés » en §11).
 >
 > Changements par rapport à la v0.1 :
 > - authentification multi-utilisateurs dès le jalon 1 (§8.1) ;
@@ -690,7 +690,7 @@ GET  /api/v1/tasks/{id}/events                SSE progression
 
 ## 8. Exigences transversales
 
-- **Temps** : tout est stocké en UTC (`timestamptz`, xarray `datetime64[ns]` sans fuseau). L'affichage en `Africa/Casablanca` utilise **tzdata IANA**. Le Maroc est en UTC+1, **sauf pendant le Ramadan (UTC+0)**, et ces bascules sont annoncées d'une année sur l'autre : l'image embarque un `tzdata` à jour, avec un test de non-régression sur les dates connues.
+- **Temps** : tout est stocké en UTC (`timestamptz`, xarray `datetime64[ns]` sans fuseau). L'affichage en `Africa/Casablanca` utilise **tzdata IANA** et il est **calculé côté serveur**, car la base de fuseaux d'un navigateur peut être ancienne. **Le Maroc est revenu à UTC+0 de façon permanente le 20/09/2026 à 02:00**. Avant cette date, il était en UTC+1, sauf pendant le Ramadan (UTC+0). Ce changement est intégré dans tzdata 2026d. L'image impose `tzdata>=2026d` et un test vérifie la conversion (jalon 2).
 - **Traçabilité** : voir §6. Chaque export contient un bloc `provenance`.
 - **i18n** : textes de l'interface, codes d'erreur et rapport PDF disponibles en FR et en EN.
 - **Journalisation** : logs JSON structurés, avec id de tâche et de run.
@@ -738,8 +738,8 @@ Chaque jalon se termine par une **démonstration** (scénario reproductible dans
 
 | # | Jalon | Contenu | Démonstration |
 |---|---|---|---|
-| 1 | **Carte et points de grille** | Squelette Docker Compose, BDD et migrations, **authentification multi-utilisateurs et rôles par projet**, conversions CRS, saisie (formulaire, clic, CSV/KML), catalogue des modèles, recherche des points (régulière et ICON), altitude modèle vs DEM, masque terre/mer, carte MapLibre avec couches par modèle, i18n FR/EN. | Site près d'Essaouira (terrain côtier) et site près de Dakhla (ICON-EU désactivé). |
-| 2 | **Téléchargement des prévisions** | (2a) Open-Meteo pour le prototypage ; (2b) GRIB natifs GFS / IFS / ICON / ICON-EU ; ensembles ; harmonisation temporelle ; exports ; séries temporelles, rose des vents, comparaison ; **archiveur Celery beat**. | Téléchargement multi-modèles sur 2 points, export NetCDF, pas de 10 min marqué « interpolé ». |
+| 1 | **Carte et points de grille** (livré) | Squelette Docker Compose, BDD et migrations, **authentification multi-utilisateurs et rôles par projet**, conversions CRS, saisie (formulaire, clic, CSV/KML), catalogue des modèles, recherche des points (régulière et ICON), altitude modèle vs DEM, masque terre/mer, carte MapLibre avec couches par modèle, i18n FR/EN. | Site près d'Essaouira (terrain côtier) et site près de Dakhla (ICON-EU désactivé). |
+| 2 | **Téléchargement des prévisions** (livré) | (2a) Open-Meteo pour le prototypage ; (2b) GRIB natifs GFS / IFS / ICON / ICON-EU ; ensembles ; harmonisation temporelle ; exports ; séries temporelles, rose des vents, comparaison ; **archiveur Celery beat**. | Téléchargement multi-modèles sur 2 points, export NetCDF, pas de 10 min marqué « interpolé ». |
 | 3 | **Import du parc et du mât** | Layout, `.wtg`/CSV, mât (CSV, TOA5, exports NRG/Windographer), contrôle qualité avec drapeaux, cisaillement et TI par secteur, MNT GLO-30, WorldCover et z0. | Parc de démonstration + mât synthétique avec gel et ombrage détectés. |
 | 4 | **PyWake et terrain** | **Import des speed-ups (format pivot + parseur natif WEng d'après votre exemple)**, repli `.rsf`/`.wrg` et WindNinja, RIX, XRSite, modèles de sillage, LUT, densité, champ de sillage sur la carte, tests IEA37 et Horns Rev. | Production brute par éolienne sur une prévision réelle, carte de sillage à 270° / 8 m/s. |
 | 5 | **Pertes et probabiliste** | Moteur de pertes, cascade, calendriers, chaîne par membre d'ensemble, quantiles, rapport PDF. | P10–P90 sur 14 jours, waterfall, PDF. |
@@ -782,7 +782,19 @@ Chaque jalon se termine par une **démonstration** (scénario reproductible dans
 | Progression des tâches | Suivi par interrogation périodique (1 s) de `task_log`. | Le flux SSE est reporté au jalon 2 (téléchargements longs). |
 | E-mails | Les validateurs stricts refusent les domaines internes (`.local`). | Validation souple. |
 
-### Ce dont j'aurai besoin plus tard (sans bloquer le jalon 1)
+### Écarts constatés au jalon 2
+
+| Sujet | Constat | Décision |
+|---|---|---|
+| Heure légale du Maroc | Retour permanent à **UTC+0 le 20/09/2026** (tzdata 2026d). La tzdata 2025b du système de base l'ignore encore. | Conversion côté serveur, `tzdata>=2026d` imposé. Les exports portent `time_utc` et, en option, `time_local` avec son décalage explicite. |
+| Volumes AWS / ECMWF | Aucun découpage côté serveur : chaque champ est global. Volumes mesurés : GFS 240 h ≈ 1 Go, IFS 240 h ≈ 0,5 Go, ENS 50 membres 48 h (100 m seulement) ≈ 2,2 Go, ENS 360 h ≈ 11 Go, GEFS 384 h ≈ 8,5 Go. | Estimation préalable affichée et plafond par extrait (`GREENARD_MAX_DOWNLOAD_MB`, 3 Go par défaut). En mode automatique, les sources qui extraient au point passent d'abord : NOMADS (GFS, GEFS) et Open-Meteo (ENS). |
+| ENS open data | Les fichiers « ef » ne contiennent que les **50 membres perturbés** : le membre de contrôle est absent. | Quantiles calculés sur 50 membres. |
+| ICON-EPS | Nécessite la grille R3B06 et ses invariants, et ne peut pas être testé ici (DWD bloqué). | Reporté ; à ajouter dès que le DWD est joignable depuis le serveur. |
+| Open-Meteo | Donne un pas horaire même pour les modèles 3-/6-horaires, et le run n'est pas toujours exposé. | Seules les échéances natives sont conservées. Le run est lu dans les métadonnées Open-Meteo, sinon déduit de la latence typique (information inscrite dans l'extrait). |
+| Archives historiques | Open-Meteo « Historical Forecast » assemble plusieurs runs successifs : ce n'est pas la prévision d'un run unique. | Archives natives via AWS (GFS depuis 2021, IFS depuis 2023) et archivage automatique. Les API « Previous Runs » d'Open-Meteo seront évaluées au jalon 6. |
+| ECMWF 0,1° | Catalogue temps réel ouvert (CC-BY 4.0) depuis le 01/10/2025. La résolution 9 km doit rejoindre le sous-ensemble gratuit « plus tard en 2026 », avec 2 h de latence. Les gros volumes peuvent entraîner des frais de service. | Source `ecmwf_hres_01` réservée, désactivée. Voir `docs/ECMWF_0p1.md`. |
+
+### Ce dont j'aurai besoin plus tard
 
 - **Jalon 3** : un extrait de CSV mât (quelques jours, anonymisé si besoin) et un `.wtg` représentatif.
 - **Jalon 4** : un **export natif WAsP Engineering** (tableau de résultats par point et par direction), pour écrire son parseur.

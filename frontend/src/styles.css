@@ -97,3 +97,30 @@ progress { width: 100%; }
 .members { padding-left: 18px; }
 details > summary { cursor: pointer; font-weight: 600; }
 .import { margin-top: 8px; }
+.tabs.big { margin: 10px 0 8px; }
+.tabs.big .tab { font-size: 14px; padding: 7px 14px; }
+.fc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+legend { font-weight: 600; font-size: 13px; padding: 0 4px; }
+legend.sub { font-weight: 500; color: var(--muted); font-size: 12px; margin-top: 4px; padding: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { flex-direction: row; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; color: var(--text); font-size: 12px; }
+.check.paid { color: var(--warning); }
+.badge.paid { background: #fff4d9; color: var(--warning); }
+.progress-box { display: grid; gap: 4px; margin-top: 8px; }
+.job-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; }
+.job { display: grid; grid-template-columns: 90px 1fr auto; gap: 8px; align-items: center; text-align: left; background: #fff; }
+.job.active { border-color: var(--primary); background: #eef8f3; }
+.status { font-size: 11px; border-radius: 10px; padding: 1px 6px; text-align: center; background: #eef0f3; }
+.status.success { background: #ecfdf3; color: var(--ok); }
+.status.failure { background: #fef3f2; color: var(--error); }
+.status.partial, .status.running { background: #fffaeb; color: var(--warning); }
+.extract-list { display: grid; gap: 4px; margin-bottom: 8px; }
+.extract { font-size: 13px; }
+.attempts { display: inline-block; margin-left: 8px; font-size: 12px; }
+.attempts summary { font-weight: 400; color: var(--muted); }
+.controls { align-items: flex-end; }
+.controls .export { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+.chart-card { border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin: 8px 0; min-width: 0; }
+.chart-card h4 { margin: 0 0 4px; font-size: 13px; }
+.chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 8px; }

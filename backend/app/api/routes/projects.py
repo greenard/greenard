@@ -7,6 +7,7 @@ from app.api.schemas import MemberIn, MemberOut, ProjectIn, ProjectOut, ProjectU
 from app.core.errors import AppError, NotFound
 from app.db.models import Project, ProjectMember, ProjectRole, Site, User
 from app.db.session import get_db
+from app.nwp.catalog import get_model
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -21,6 +22,9 @@ def _out(db: Session, p: Project, role: ProjectRole) -> ProjectOut:
         created_at=p.created_at,
         role=role,
         site_count=count,
+        archive_enabled=bool(p.archive_enabled),
+        archive_models=p.archive_models or [],
+        archive_max_lead_h=p.archive_max_lead_h or 168,
     )
 
 
@@ -59,6 +63,9 @@ def update_project(
     project_id: int, body: ProjectUpdate, user: User = Depends(current_user), db: Session = Depends(get_db)
 ) -> ProjectOut:
     p = require_project(db, project_id, user, ProjectRole.owner)
+    if body.archive_models is not None:
+        for m in body.archive_models:
+            get_model(m)
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
     audit(db, user, "project_updated", "project", p.id, **body.model_dump(exclude_unset=True))

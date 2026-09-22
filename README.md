@@ -5,14 +5,15 @@ et de prévision de production éolienne (PyWake, pertes IEC 61400-15-2, probabi
 
 - Architecture et décisions : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (v0.3)
 - Hypothèses et limites : [`docs/LIMITS.md`](docs/LIMITS.md)
-- Démonstration du jalon 1 : [`docs/demo/jalon1/`](docs/demo/jalon1/README.md)
+- Démonstrations : [jalon 1](docs/demo/jalon1/README.md), [jalon 2](docs/demo/jalon2/README.md)
+- Accès ECMWF 0,1° : [`docs/ECMWF_0p1.md`](docs/ECMWF_0p1.md)
 
 ## Avancement
 
 | Jalon | Contenu | État |
 |---|---|---|
 | 1 | Carte, points de grille, authentification | **livré** |
-| 2 | Téléchargement des prévisions | à venir |
+| 2 | Téléchargement des prévisions | **livré** |
 | 3 | Import du parc et du mât | à venir |
 | 4 | PyWake et terrain | à venir |
 | 5 | Pertes et probabiliste | à venir |
@@ -40,7 +41,12 @@ CA interne (`GREENARD_TLS=internal`) ; pour utiliser le certificat de l'entrepri
 `cert.pem` et `key.pem` dans `deploy/certs/` et définir `GREENARD_TLS="/certs/cert.pem /certs/key.pem"`.
 
 Services : `db` (PostgreSQL 16 + PostGIS 3.4), `redis`, `api` (FastAPI, applique les migrations au
-démarrage), `worker-io` (Celery), `frontend` (nginx), `proxy` (Caddy, seul service exposé).
+démarrage), `worker-io` (Celery : téléchargements), `beat` (Celery beat : archivage automatique horaire),
+`frontend` (nginx), `proxy` (Caddy, seul service exposé).
+
+Prévisions stockées dans le volume `greenard_appdata` (`/data/forecasts`, NetCDF compressé par extrait).
+Prévoir de l'espace : quelques Mo par extrait au point, mais des téléchargements transitoires de
+plusieurs centaines de Mo (champs globaux AWS/ECMWF, plafond `GREENARD_MAX_DOWNLOAD_MB`).
 
 **Sauvegardes** : base `docker compose exec db pg_dump -U greenard -Fc greenard > greenard.dump` ;
 fichiers : volume `greenard_appdata` (champs invariants, et à partir du jalon 2 archives de prévisions).

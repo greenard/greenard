@@ -156,3 +156,19 @@ def get_model(code: str) -> ModelSpec:
         return MODELS[code]
     except KeyError:
         raise NotFound("MODEL_UNKNOWN", f"Unknown model {code!r}", model=code) from None
+
+
+def native_leads(code: str, run_hour: int, max_lead_h: int | None = None) -> list[int]:
+    """Échéances natives (h) d'un run selon le calendrier du catalogue."""
+    spec = get_model(code)
+    schedule = None
+    for key, steps in spec.native_steps.items():
+        if f"{run_hour:02d}" in key.split("/"):
+            schedule = steps
+    if schedule is None:
+        schedule = next(iter(spec.native_steps.values()))
+    leads, start = [], 0
+    for until, step in schedule:
+        leads += list(range(start, until + 1, step))
+        start = leads[-1] + step
+    return [h for h in leads if max_lead_h is None or h <= max_lead_h]

@@ -16,6 +16,7 @@ from sqlalchemy import text  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.models import Base, User  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
+from app.forecasts import governance  # noqa: E402
 from app.main import app  # noqa: E402
 from app.nwp import invariants  # noqa: E402
 from app.nwp.catalog import MODELS  # noqa: E402
@@ -40,8 +41,14 @@ def schema():
 @pytest.fixture(autouse=True)
 def clean():
     with engine.begin() as c:
-        c.execute(text("TRUNCATE app_user, project, grid_point, task_log, audit_log RESTART IDENTITY CASCADE"))
+        c.execute(
+            text(
+                "TRUNCATE app_user, project, grid_point, task_log, audit_log, nwp_run, data_source "
+                "RESTART IDENTITY CASCADE"
+            )
+        )
     with SessionLocal() as db:
+        governance.seed(db)
         db.add_all(
             [
                 User(email="admin@example.org", password_hash=hash_password(PWD), is_admin=True),

@@ -92,6 +92,10 @@ class Project(Base):
     default_crs: Mapped[str] = mapped_column(String(32), default="EPSG:4326")
     created_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Archivage automatique des runs sur les points sélectionnés (calibration, jalon 6)
+    archive_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    archive_models: Mapped[list[str]] = mapped_column(JSONType, default=list, server_default="[]")
+    archive_max_lead_h: Mapped[int] = mapped_column(Integer, default=168, server_default="168")
 
     members: Mapped[list["ProjectMember"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     sites: Mapped[list["Site"]] = relationship(back_populates="project", cascade="all, delete-orphan")
@@ -180,3 +184,77 @@ class TaskLog(Base):
     project_id: Mapped[int | None] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DataSource(Base):
+    """Gouvernance des sources de données : licence d'usage et coût (§4.3.5)."""
+
+    __tablename__ = "data_source"
+
+    code: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    usage_licence: Mapped[str] = mapped_column(String(16))  # open | non_commercial | contract
+    cost: Mapped[str] = mapped_column(String(8))  # free | paid
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    implemented: Mapped[bool] = mapped_column(Boolean, default=True)
+    terms_url: Mapped[str] = mapped_column(String(300), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+
+class NwpRun(Base):
+    __tablename__ = "nwp_run"
+    __table_args__ = (UniqueConstraint("model_code", "init_time", "source"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    model_code: Mapped[str] = mapped_column(String(32), index=True)
+    init_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    source: Mapped[str] = mapped_column(String(32))
+    first_retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ForecastJob(Base):
+    """Demande de téléchargement (un site, plusieurs modèles) ou archivage automatique."""
+
+    __tablename__ = "forecast_job"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), index=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("site.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16), default="manual")  # manual | archive
+    params: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    task_id: Mapped[int | None] = mapped_column(ForeignKey("task_log.id", ondelete="SET NULL"))
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+    extracts: Mapped[list["ForecastExtract"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan", order_by="ForecastExtract.id"
+    )
+
+
+class ForecastExtract(Base):
+    """Résultat d'un modèle pour un job : fichier NetCDF brut (échéances natives) et traçabilité."""
+
+    __tablename__ = "forecast_extract"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("forecast_job.id", ondelete="CASCADE"), index=True)
+    model_code: Mapped[str] = mapped_column(String(32))
+    nwp_run_id: Mapped[int | None] = mapped_column(ForeignKey("nwp_run.id", ondelete="SET NULL"))
+    source: Mapped[str] = mapped_column(String(32), default="")
+    paid: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | success | failure
+    error: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    attempts: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, default=list)
+    grid_point_ids: Mapped[list[int]] = mapped_column(JSONType, default=list)
+    n_members: Mapped[int] = mapped_column(Integer, default=0)
+    n_times: Mapped[int] = mapped_column(Integer, default=0)
+    variables: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    missing_variables: Mapped[list[str]] = mapped_column(JSONType, default=list)
+    estimate: Mapped[dict[str, Any]] = mapped_column(JSONType, default=dict)
+    file_uri: Mapped[str] = mapped_column(String(500), default="")
+    file_hash: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    job: Mapped[ForecastJob] = relationship(back_populates="extracts")
+    run: Mapped[NwpRun | None] = relationship()

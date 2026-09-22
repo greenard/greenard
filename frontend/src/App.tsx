@@ -3,6 +3,7 @@ import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { setLanguage } from "./i18n";
 import AdminUsersPage from "./pages/AdminUsersPage";
+import DataSourcesPage from "./pages/DataSourcesPage";
 import LoginPage from "./pages/LoginPage";
 import ProjectPage from "./pages/ProjectPage";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -20,6 +21,7 @@ function Header() {
       </Link>
       <nav>
         <Link to="/">{t("header.projects")}</Link>
+        <Link to="/data-sources">{t("header.sources")}</Link>
         {user?.is_admin && <Link to="/admin/users">{t("header.users")}</Link>}
       </nav>
       <div className="topbar-right">
@@ -63,6 +65,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<ProjectsPage />} />
           <Route path="/projects/:projectId" element={<ProjectPage />} />
+          <Route path="/data-sources" element={<DataSourcesPage />} />
           <Route path="/admin/users" element={user.is_admin ? <AdminUsersPage /> : <Navigate to="/" />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

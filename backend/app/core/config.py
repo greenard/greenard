@@ -44,6 +44,20 @@ class Settings(BaseSettings):
     icon_grid_file: Path | None = None
 
     elevation_alert_m: float = 100.0
+
+    # Téléchargement des prévisions
+    max_download_mb: int = 3000  # plafond par extrait (modèle × run), estimé avant téléchargement
+    download_workers: int = 8
+    nomads_base_url: str = "https://nomads.ncep.noaa.gov"
+    ecmwf_base_url: str = "https://data.ecmwf.int/forecasts"
+    ecmwf_aws_url: str = "https://ecmwf-forecasts.s3.amazonaws.com"
+    dwd_base_url: str = "https://opendata.dwd.de/weather/nwp"
+    # Open-Meteo : public (non commercial) | api_key (abonnement) | self_hosted
+    open_meteo_mode: Literal["public", "api_key", "self_hosted"] = "public"
+    open_meteo_api_key: str = ""
+    open_meteo_base_url: str = ""  # instance auto-hébergée
+    # Archivage automatique des runs (Celery beat), en minutes
+    archive_interval_min: int = 60
     icon_eu_margin_cells: int = 5
 
 

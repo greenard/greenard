@@ -80,6 +80,9 @@ class ProjectUpdate(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     description: str | None = None
     display_tz: str | None = Field(None, pattern="^(UTC|Africa/Casablanca)$")
+    archive_enabled: bool | None = None
+    archive_models: list[str] | None = None
+    archive_max_lead_h: int | None = Field(None, ge=6, le=384)
 
 
 class ProjectOut(BaseModel):
@@ -90,6 +93,9 @@ class ProjectOut(BaseModel):
     created_at: datetime
     role: ProjectRole
     site_count: int
+    archive_enabled: bool = False
+    archive_models: list[str] = []
+    archive_max_lead_h: int = 168
 
 
 class MemberIn(BaseModel):

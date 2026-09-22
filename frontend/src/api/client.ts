@@ -81,3 +81,52 @@ export const post = <T,>(p: string, body?: unknown) =>
 export const patch = <T,>(p: string, body: unknown) => api<T>(p, { method: "PATCH", body: JSON.stringify(body) });
 export const put = <T,>(p: string, body: unknown) => api<T>(p, { method: "PUT", body: JSON.stringify(body) });
 export const del = <T,>(p: string) => api<T>(p, { method: "DELETE" });
+
+/** Flux SSE de progression d'une tâche (fetch en flux : l'en-tête d'authentification est transmis). */
+export async function streamTask<T>(taskId: number, onEvent: (t: T) => void, signal?: AbortSignal): Promise<void> {
+  const open = () =>
+    fetch(`${BASE}/tasks/${taskId}/events`, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      credentials: "same-origin",
+      signal,
+    });
+  let r = await open();
+  if (r.status === 401 && (await refreshAccessToken())) r = await open();
+  if (!r.ok || !r.body) throw await parseError(r);
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    buf += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buf.indexOf("\n\n")) >= 0) {
+      const chunk = buf.slice(0, idx);
+      buf = buf.slice(idx + 2);
+      for (const line of chunk.split("\n")) if (line.startsWith("data:")) onEvent(JSON.parse(line.slice(5)) as T);
+    }
+  }
+}
+
+/** Téléchargement authentifié d'un fichier (export). */
+export async function downloadFile(path: string): Promise<void> {
+  const go = () =>
+    fetch(`${BASE}${path}`, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      credentials: "same-origin",
+    });
+  let r = await go();
+  if (r.status === 401 && (await refreshAccessToken())) r = await go();
+  if (!r.ok) throw await parseError(r);
+  const cd = r.headers.get("content-disposition") ?? "";
+  const name = /filename="([^"]+)"/.exec(cd)?.[1] ?? "export";
+  const url = URL.createObjectURL(await r.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}

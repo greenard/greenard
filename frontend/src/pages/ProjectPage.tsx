@@ -6,8 +6,10 @@ import { del, get, patch, post } from "../api/client";
 import type { CrsItem, GridPoint, ModelInfo, Project, Representations, Site } from "../api/types";
 import CoordinateInput, { coordPayload, emptyCoord, type CoordValue } from "../components/CoordinateInput";
 import GridPointsPanel, { useGridPoints } from "../components/GridPointsPanel";
+import ArchivePanel from "../components/ArchivePanel";
 import MembersPanel from "../components/MembersPanel";
 import SiteImport from "../components/SiteImport";
+import ForecastPanel from "../forecast/ForecastPanel";
 import MapView from "../map/MapView";
 import { errorText, fmt, formatDateTime } from "../utils/format";
 import { usePrefs } from "../utils/prefs";
@@ -29,6 +31,21 @@ export default function ProjectPage() {
   const [resolved, setResolved] = useState<Representations | null>(null);
   const [name, setName] = useState("");
   const [visible, setVisible] = useState<Record<string, boolean>>({});
+  const [tab, setTab] = useState<"grid" | "forecast">(() => {
+    try {
+      return localStorage.getItem("greenard.tab") === "forecast" ? "forecast" : "grid";
+    } catch {
+      return "grid";
+    }
+  });
+  const chooseTab = (v: "grid" | "forecast") => {
+    setTab(v);
+    try {
+      localStorage.setItem("greenard.tab", v);
+    } catch {
+      /* stockage indisponible */
+    }
+  };
 
   useEffect(() => {
     if (activeId === null && sites.data?.length) setActiveId(sites.data[0].id);
@@ -76,6 +93,9 @@ export default function ProjectPage() {
         <h2>{project.data?.name}</h2>
         <p className="muted">{project.data?.description}</p>
         <MembersPanel projectId={pid} canManage={project.data?.role === "owner"} />
+        {project.data?.role === "owner" && models.data && (
+          <ArchivePanel project={project.data} models={models.data.filter((m) => m.milestone === 1 || m.members > 1)} />
+        )}
 
         <section className="card">
           <h3>{t("site.sites")}</h3>
@@ -149,15 +169,27 @@ export default function ProjectPage() {
                 {formatDateTime(active.created_at, tz, i18n.language)}
               </span>
             </div>
-            <GridPointsPanel
-              key={active.id}
-              site={active}
-              models={models.data}
-              canEdit={canEdit}
-              visible={visible}
-              setVisible={setVisible}
-              points={gp.data?.points ?? []}
-            />
+            <div className="tabs big" role="tablist">
+              <button className={tab === "grid" ? "tab active" : "tab"} onClick={() => chooseTab("grid")}>
+                {t("grid.title")}
+              </button>
+              <button className={tab === "forecast" ? "tab active" : "tab"} onClick={() => chooseTab("forecast")}>
+                {t("fc.tab")}
+              </button>
+            </div>
+            {tab === "grid" ? (
+              <GridPointsPanel
+                key={active.id}
+                site={active}
+                models={models.data}
+                canEdit={canEdit}
+                visible={visible}
+                setVisible={setVisible}
+                points={gp.data?.points ?? []}
+              />
+            ) : (
+              <ForecastPanel key={active.id} siteId={active.id} models={models.data} points={gp.data?.points ?? []} canEdit={canEdit} />
+            )}
           </div>
         )}
       </div>

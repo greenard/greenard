@@ -19,6 +19,9 @@ export interface Project {
   created_at: string;
   role: Role;
   site_count: number;
+  archive_enabled: boolean;
+  archive_models: string[];
+  archive_max_lead_h: number;
 }
 
 export interface Member {
@@ -145,4 +148,145 @@ export interface ImportReport {
   sites: { row: number; name: string; lat: number; lon: number; input_crs: string }[];
   errors: ImportRowError[];
   created: number[];
+}
+
+export interface ForecastParams {
+  models: string[];
+  run: string;
+  max_lead_h: number;
+  wind_heights_m: number[];
+  pressure_levels_hpa: number[];
+  surface: string[];
+  source: string;
+  members: number[] | null;
+  accept_paid: boolean;
+}
+
+export interface ErrorPayload {
+  code: string;
+  message?: string;
+  params?: Record<string, unknown>;
+}
+
+export interface EstimateInfo {
+  n_requests: number;
+  bytes: number | null;
+  megabytes: number | null;
+  n_steps: number;
+  first_lead_h: number | null;
+  last_lead_h: number | null;
+  available_variables: string[];
+  missing_variables: string[];
+  members: number;
+  notes: string[];
+}
+
+export interface Extract {
+  id: number;
+  model: string;
+  status: "pending" | "running" | "success" | "failure";
+  source: string;
+  paid: boolean;
+  run: string | null;
+  n_members: number;
+  n_times: number;
+  variables: string[];
+  missing_variables: string[];
+  grid_point_ids: number[];
+  estimate: Partial<EstimateInfo>;
+  error: ErrorPayload | Record<string, never>;
+  attempts: (ErrorPayload & { source: string })[];
+}
+
+export interface ForecastJob {
+  id: number;
+  site_id: number;
+  kind: "manual" | "archive";
+  status: "pending" | "running" | "success" | "partial" | "failure";
+  params: ForecastParams;
+  task_id: number | null;
+  created_at: string;
+  extracts: Extract[];
+}
+
+export interface EstimateResponse {
+  limit_mb: number;
+  models: {
+    model: string;
+    points: number;
+    error?: ErrorPayload;
+    candidates: { source: string; run?: string; licence?: string; cost?: string; estimate?: EstimateInfo; over_limit?: boolean; error?: ErrorPayload }[];
+  }[];
+}
+
+export interface SeriesVar {
+  unit: string;
+  values?: (number | null)[];
+  p10?: (number | null)[];
+  p25?: (number | null)[];
+  p50?: (number | null)[];
+  p75?: (number | null)[];
+  p90?: (number | null)[];
+  min?: (number | null)[];
+  max?: (number | null)[];
+  mean?: (number | null)[];
+}
+
+export interface SeriesModel {
+  model: string;
+  run: string;
+  source: string;
+  members: number;
+  times: string[];
+  times_local: string[];
+  flags: ("native" | "aggregated" | "interpolated")[];
+  points: { grid_point_id: number; lat: number; lon: number; variables: Record<string, SeriesVar> }[];
+  derived_heights_m: string;
+  missing_variables: string;
+}
+
+export interface SeriesResponse {
+  step: string;
+  method: string;
+  speed_method: string;
+  models: SeriesModel[];
+}
+
+export interface WindRose {
+  sectors_deg: number[];
+  speed_bins: string[];
+  frequency_pct: number[][];
+  n: number;
+  mean_speed: number;
+}
+
+export interface Comparison {
+  height_m: number;
+  step: string;
+  times: string[];
+  models: string[];
+  values: Record<string, (number | null)[]>;
+  multi_model_mean: (number | null)[];
+  stats: { model: string; mean: number; std: number; bias_vs_mmm: number; rmsd_vs_mmm: number; corr_vs_mmm: number | null }[];
+  n_common_times: number;
+}
+
+export interface DataSourceInfo {
+  code: string;
+  name: string;
+  usage_licence: "open" | "non_commercial" | "contract";
+  cost: "free" | "paid";
+  enabled: boolean;
+  implemented: boolean;
+  mode: string;
+  terms_url: string;
+  notes: string;
+  blocked_by_deployment: boolean;
+}
+
+export interface DataSources {
+  deployment_usage: "internal" | "commercial";
+  open_meteo_mode: string;
+  max_download_mb: number;
+  sources: DataSourceInfo[];
 }
