@@ -1,0 +1,111 @@
+{
+  "app": { "title": "Greenard", "subtitle": "Prévision météo & éolienne" },
+  "common": {
+    "save": "Enregistrer", "cancel": "Annuler", "delete": "Supprimer", "create": "Créer", "close": "Fermer",
+    "loading": "Chargement…", "yes": "Oui", "no": "Non", "none": "—", "confirmDelete": "Confirmer la suppression ?",
+    "copy": "Copier", "role": "Rôle", "actions": "Actions", "name": "Nom", "email": "E-mail"
+  },
+  "header": {
+    "projects": "Projets", "users": "Utilisateurs", "logout": "Déconnexion", "language": "Langue",
+    "timeDisplay": "Heure affichée", "utc": "UTC", "local": "Maroc (heure locale)"
+  },
+  "login": {
+    "title": "Connexion", "email": "E-mail", "password": "Mot de passe", "submit": "Se connecter"
+  },
+  "projects": {
+    "title": "Projets", "new": "Nouveau projet", "empty": "Aucun projet. Créez-en un pour commencer.",
+    "sites": "{{count}} site(s)", "description": "Description", "members": "Membres", "addMember": "Ajouter / modifier",
+    "roles": { "owner": "Propriétaire", "engineer": "Ingénieur", "viewer": "Lecteur" }
+  },
+  "site": {
+    "sites": "Sites", "new": "Nouveau site", "name": "Nom du site", "add": "Ajouter le site",
+    "import": "Importer (CSV / KML)", "importHelp": "CSV : colonnes name + lat/lon (décimal ou DMS) ou x/y/crs. KML : Placemarks ponctuels.",
+    "importCheck": "Vérifier", "importConfirm": "Importer {{count}} site(s)", "importOk": "{{count}} site(s) importé(s)",
+    "row": "Ligne", "field": "Champ", "message": "Message",
+    "clickMap": "Astuce : cliquez sur la carte pour saisir les coordonnées.",
+    "demElevation": "Altitude MNT (Copernicus GLO-30)", "empty": "Aucun site."
+  },
+  "coord": {
+    "mode": "Système de saisie", "wgs84": "WGS84 (décimal ou DMS)", "utm": "UTM", "lambert": "Lambert Merchich",
+    "lat": "Latitude", "lon": "Longitude", "x": "X (m)", "y": "Y (m)", "zone": "Zone", "hemisphere": "Hémisphère",
+    "autoZone": "zone détectée automatiquement", "lambertZone": "Zone Lambert",
+    "conversions": "Conversions", "decimal": "Décimal", "dms": "DMS", "transformation": "Transformation",
+    "accuracy": "précision nominale {{value}} m", "unknownAccuracy": "précision inconnue",
+    "noLambert": "Aucune zone Lambert Merchich ne couvre ce point.", "deprecated": "(dépréciée, lecture seule)"
+  },
+  "grid": {
+    "title": "Points de grille", "models": "Modèles", "method": "Méthode", "bracket": "4 nœuds encadrants",
+    "nearest": "N plus proches", "n": "N", "compute": "Identifier les points", "computing": "Calcul en cours…",
+    "milestone2": "téléchargement au jalon 2", "invariantsReady": "invariants prêts", "invariantsMissing": "invariants à télécharger",
+    "unavailable": "Indisponible pour ce site", "layers": "Couches", "select": "Sél.", "dist": "Dist. (km)", "az": "Azimut",
+    "lat": "Lat", "lon": "Lon", "zModel": "Alt. modèle (m)", "zDem": "Alt. MNT nœud / maille (m)", "dz": "Écart vs site (m)",
+    "land": "Terre/mer", "landYes": "terre", "landNo": "mer", "contains": "cellule du site",
+    "elevAlert": "Écart d'altitude > {{value}} m", "landSeaAlert": "Point en mer alors que le site est à terre",
+    "noPoints": "Aucun point calculé pour ce site.", "selectedCount": "{{count}} point(s) sélectionné(s)",
+    "index": "Index natif", "taskFailed": "Échec du calcul", "warning": "Avertissement"
+  },
+  "map": { "basemap": "Fond de carte", "osm": "OpenStreetMap", "offline": "Hors-ligne (côtes)", "domain": "Domaine {{model}}" },
+  "users": {
+    "title": "Utilisateurs", "new": "Nouvel utilisateur", "fullName": "Nom complet", "password": "Mot de passe initial",
+    "admin": "Administrateur", "active": "Actif", "lastLogin": "Dernière connexion", "deactivate": "Désactiver", "activate": "Activer"
+  },
+  "errors": {
+    "AUTH_REQUIRED": "Authentification requise.",
+    "AUTH_TOKEN_INVALID": "Session invalide ou expirée.",
+    "AUTH_INVALID_CREDENTIALS": "E-mail ou mot de passe incorrect.",
+    "AUTH_LOCKED": "Compte temporairement verrouillé après plusieurs échecs ({{minutes}} min).",
+    "AUTH_SESSION_EXPIRED": "Session expirée, veuillez vous reconnecter.",
+    "AUTH_CSRF": "Requête refusée (protection CSRF).",
+    "ADMIN_REQUIRED": "Réservé aux administrateurs.",
+    "PASSWORD_TOO_SHORT": "Mot de passe trop court (minimum {{min_length}} caractères).",
+    "USER_EMAIL_EXISTS": "Cet e-mail est déjà utilisé.",
+    "USER_NOT_FOUND": "Utilisateur introuvable.",
+    "USER_CANNOT_DEMOTE_SELF": "Vous ne pouvez pas retirer vos propres droits d'administrateur.",
+    "PROJECT_NOT_FOUND": "Projet introuvable.",
+    "PROJECT_ROLE_INSUFFICIENT": "Droits insuffisants sur ce projet (rôle requis : {{required}}).",
+    "PROJECT_LAST_OWNER": "Un projet doit conserver au moins un propriétaire.",
+    "MEMBER_NOT_FOUND": "Membre introuvable.",
+    "SITE_NOT_FOUND": "Site introuvable.",
+    "COORD_EMPTY": "Coordonnée vide.",
+    "COORD_MISSING": "Coordonnées incomplètes.",
+    "COORD_UNPARSABLE": "Coordonnée illisible : « {{value}} ».",
+    "COORD_OUT_OF_RANGE": "Coordonnée hors limites ({{field}} = {{value}}).",
+    "COORD_MINUTES_SECONDS_RANGE": "Les minutes et secondes doivent être inférieures à 60.",
+    "COORD_SIGN_AND_HEMISPHERE": "Indiquez soit un signe, soit une lettre d'hémisphère, pas les deux.",
+    "COORD_WRONG_HEMISPHERE": "Lettre d'hémisphère incompatible avec une {{field}}.",
+    "COORD_TRANSFORM_FAILED": "La transformation de coordonnées a échoué.",
+    "CRS_UNKNOWN": "Système de coordonnées inconnu : {{value}}.",
+    "CRS_OUTSIDE_AREA_OF_USE": "Point hors de la zone d'emploi du système de coordonnées.",
+    "MERCHICH_BALLPARK": "Attention : aucune transformation Merchich → WGS84 précise n'est disponible ici (transformation approximative, erreur possible de plusieurs centaines de mètres).",
+    "UTM_ZONE_INVALID": "Zone UTM invalide.",
+    "IMPORT_EMPTY": "Fichier vide.",
+    "IMPORT_ENCODING": "Encodage du fichier illisible.",
+    "IMPORT_MISSING_COLUMN": "Colonne manquante : {{column}}.",
+    "IMPORT_MISSING_COORD_COLUMNS": "Colonnes de coordonnées manquantes (lat + lon, ou x + y + crs).",
+    "IMPORT_MISSING_COORD": "Pas de coordonnées sur cette ligne.",
+    "IMPORT_MISSING_CRS": "x/y fournis sans système de coordonnées (colonne crs).",
+    "IMPORT_EMPTY_NAME": "Nom vide.",
+    "IMPORT_DUPLICATE_NAME": "Nom en double dans le fichier : {{name}}.",
+    "IMPORT_NAME_EXISTS": "Un site porte déjà ce nom dans le projet : {{name}}.",
+    "IMPORT_TOO_MANY_ROWS": "Trop de lignes (maximum {{max}}).",
+    "IMPORT_KML_INVALID": "Fichier KML invalide.",
+    "IMPORT_KML_NOT_POINT": "Placemark ignoré (géométrie non ponctuelle) : {{name}}.",
+    "IMPORT_UNSUPPORTED_FORMAT": "Format non pris en charge (CSV ou KML attendu).",
+    "IMPORT_FILE_TOO_LARGE": "Fichier trop volumineux (maximum {{max_mb}} Mo).",
+    "MODEL_UNKNOWN": "Modèle inconnu.",
+    "MODEL_SITE_OUT_OF_DOMAIN": "{{model}} ne couvre pas ce site (latitude {{lat}}°, domaine {{lat_min}}°–{{lat_max}}°N, {{lon_min}}°–{{lon_max}}°E). Utilisez un modèle global (ICON, GFS, IFS).",
+    "MODEL_SITE_IN_BOUNDARY_MARGIN": "Site trop proche du bord du domaine {{model}} (marge de {{margin_cells}} mailles, ~{{margin_km}} km) : qualité dégradée par les conditions aux limites. Modèle désactivé.",
+    "INVARIANTS_NOT_READY": "Champs invariants (altitude, terre/mer) non encore téléchargés.",
+    "SOURCE_UNREACHABLE": "Source de données injoignable ({{url}}).",
+    "SOURCE_HTTP_ERROR": "Erreur HTTP {{status}} de la source de données.",
+    "SOURCE_FIELD_MISSING": "Champ {{field}} absent de la source.",
+    "SOURCE_NO_RECENT_RUN": "Aucun run récent disponible.",
+    "GRID_N_INVALID": "N doit valoir 4, 9 ou 16.",
+    "GRID_POINT_NOT_FOUND": "Point de grille introuvable.",
+    "TASK_NOT_FOUND": "Tâche introuvable.",
+    "VALIDATION_ERROR": "Données invalides.",
+    "HTTP_ERROR": "Erreur serveur ({{status}}).",
+    "INTERNAL_ERROR": "Erreur interne.",
+    "unknown": "Erreur inattendue."
+  }
+}

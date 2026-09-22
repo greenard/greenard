@@ -1,0 +1,111 @@
+{
+  "app": { "title": "Greenard", "subtitle": "Weather & wind power forecasting" },
+  "common": {
+    "save": "Save", "cancel": "Cancel", "delete": "Delete", "create": "Create", "close": "Close",
+    "loading": "Loading…", "yes": "Yes", "no": "No", "none": "—", "confirmDelete": "Confirm deletion?",
+    "copy": "Copy", "role": "Role", "actions": "Actions", "name": "Name", "email": "Email"
+  },
+  "header": {
+    "projects": "Projects", "users": "Users", "logout": "Log out", "language": "Language",
+    "timeDisplay": "Displayed time", "utc": "UTC", "local": "Morocco (local time)"
+  },
+  "login": {
+    "title": "Sign in", "email": "Email", "password": "Password", "submit": "Sign in"
+  },
+  "projects": {
+    "title": "Projects", "new": "New project", "empty": "No project yet. Create one to get started.",
+    "sites": "{{count}} site(s)", "description": "Description", "members": "Members", "addMember": "Add / update",
+    "roles": { "owner": "Owner", "engineer": "Engineer", "viewer": "Viewer" }
+  },
+  "site": {
+    "sites": "Sites", "new": "New site", "name": "Site name", "add": "Add site",
+    "import": "Import (CSV / KML)", "importHelp": "CSV: columns name + lat/lon (decimal or DMS) or x/y/crs. KML: point Placemarks.",
+    "importCheck": "Check", "importConfirm": "Import {{count}} site(s)", "importOk": "{{count}} site(s) imported",
+    "row": "Row", "field": "Field", "message": "Message",
+    "clickMap": "Tip: click on the map to capture coordinates.",
+    "demElevation": "DEM elevation (Copernicus GLO-30)", "empty": "No site."
+  },
+  "coord": {
+    "mode": "Input system", "wgs84": "WGS84 (decimal or DMS)", "utm": "UTM", "lambert": "Lambert Merchich",
+    "lat": "Latitude", "lon": "Longitude", "x": "X (m)", "y": "Y (m)", "zone": "Zone", "hemisphere": "Hemisphere",
+    "autoZone": "zone detected automatically", "lambertZone": "Lambert zone",
+    "conversions": "Conversions", "decimal": "Decimal", "dms": "DMS", "transformation": "Transformation",
+    "accuracy": "nominal accuracy {{value}} m", "unknownAccuracy": "unknown accuracy",
+    "noLambert": "No Lambert Merchich zone covers this point.", "deprecated": "(deprecated, read-only)"
+  },
+  "grid": {
+    "title": "Grid points", "models": "Models", "method": "Method", "bracket": "4 surrounding nodes",
+    "nearest": "N nearest", "n": "N", "compute": "Identify grid points", "computing": "Computing…",
+    "milestone2": "download in milestone 2", "invariantsReady": "invariants ready", "invariantsMissing": "invariants to download",
+    "unavailable": "Unavailable for this site", "layers": "Layers", "select": "Sel.", "dist": "Dist. (km)", "az": "Azimuth",
+    "lat": "Lat", "lon": "Lon", "zModel": "Model elev. (m)", "zDem": "DEM elev. node / cell (m)", "dz": "Diff. vs site (m)",
+    "land": "Land/sea", "landYes": "land", "landNo": "sea", "contains": "site cell",
+    "elevAlert": "Elevation difference > {{value}} m", "landSeaAlert": "Sea point while the site is on land",
+    "noPoints": "No grid point computed for this site.", "selectedCount": "{{count}} point(s) selected",
+    "index": "Native index", "taskFailed": "Computation failed", "warning": "Warning"
+  },
+  "map": { "basemap": "Basemap", "osm": "OpenStreetMap", "offline": "Offline (coastlines)", "domain": "{{model}} domain" },
+  "users": {
+    "title": "Users", "new": "New user", "fullName": "Full name", "password": "Initial password",
+    "admin": "Administrator", "active": "Active", "lastLogin": "Last login", "deactivate": "Deactivate", "activate": "Activate"
+  },
+  "errors": {
+    "AUTH_REQUIRED": "Authentication required.",
+    "AUTH_TOKEN_INVALID": "Invalid or expired session.",
+    "AUTH_INVALID_CREDENTIALS": "Wrong email or password.",
+    "AUTH_LOCKED": "Account temporarily locked after repeated failures ({{minutes}} min).",
+    "AUTH_SESSION_EXPIRED": "Session expired, please sign in again.",
+    "AUTH_CSRF": "Request rejected (CSRF protection).",
+    "ADMIN_REQUIRED": "Administrators only.",
+    "PASSWORD_TOO_SHORT": "Password too short (at least {{min_length}} characters).",
+    "USER_EMAIL_EXISTS": "This email is already in use.",
+    "USER_NOT_FOUND": "User not found.",
+    "USER_CANNOT_DEMOTE_SELF": "You cannot remove your own administrator rights.",
+    "PROJECT_NOT_FOUND": "Project not found.",
+    "PROJECT_ROLE_INSUFFICIENT": "Insufficient rights on this project (required role: {{required}}).",
+    "PROJECT_LAST_OWNER": "A project must keep at least one owner.",
+    "MEMBER_NOT_FOUND": "Member not found.",
+    "SITE_NOT_FOUND": "Site not found.",
+    "COORD_EMPTY": "Empty coordinate.",
+    "COORD_MISSING": "Incomplete coordinates.",
+    "COORD_UNPARSABLE": "Unreadable coordinate: “{{value}}”.",
+    "COORD_OUT_OF_RANGE": "Coordinate out of range ({{field}} = {{value}}).",
+    "COORD_MINUTES_SECONDS_RANGE": "Minutes and seconds must be below 60.",
+    "COORD_SIGN_AND_HEMISPHERE": "Use either a sign or a hemisphere letter, not both.",
+    "COORD_WRONG_HEMISPHERE": "Hemisphere letter not valid for a {{field}}.",
+    "COORD_TRANSFORM_FAILED": "Coordinate transformation failed.",
+    "CRS_UNKNOWN": "Unknown coordinate reference system: {{value}}.",
+    "CRS_OUTSIDE_AREA_OF_USE": "Point outside the area of use of the coordinate system.",
+    "MERCHICH_BALLPARK": "Warning: no accurate Merchich → WGS84 transformation is available here (ballpark transformation, error may reach several hundred metres).",
+    "UTM_ZONE_INVALID": "Invalid UTM zone.",
+    "IMPORT_EMPTY": "Empty file.",
+    "IMPORT_ENCODING": "Unreadable file encoding.",
+    "IMPORT_MISSING_COLUMN": "Missing column: {{column}}.",
+    "IMPORT_MISSING_COORD_COLUMNS": "Missing coordinate columns (lat + lon, or x + y + crs).",
+    "IMPORT_MISSING_COORD": "No coordinates on this row.",
+    "IMPORT_MISSING_CRS": "x/y given without a coordinate system (crs column).",
+    "IMPORT_EMPTY_NAME": "Empty name.",
+    "IMPORT_DUPLICATE_NAME": "Duplicate name in file: {{name}}.",
+    "IMPORT_NAME_EXISTS": "A site with this name already exists in the project: {{name}}.",
+    "IMPORT_TOO_MANY_ROWS": "Too many rows (maximum {{max}}).",
+    "IMPORT_KML_INVALID": "Invalid KML file.",
+    "IMPORT_KML_NOT_POINT": "Placemark skipped (not a point): {{name}}.",
+    "IMPORT_UNSUPPORTED_FORMAT": "Unsupported format (CSV or KML expected).",
+    "IMPORT_FILE_TOO_LARGE": "File too large (maximum {{max_mb}} MB).",
+    "MODEL_UNKNOWN": "Unknown model.",
+    "MODEL_SITE_OUT_OF_DOMAIN": "{{model}} does not cover this site (latitude {{lat}}°, domain {{lat_min}}°–{{lat_max}}°N, {{lon_min}}°–{{lon_max}}°E). Use a global model (ICON, GFS, IFS).",
+    "MODEL_SITE_IN_BOUNDARY_MARGIN": "Site too close to the {{model}} domain boundary (margin of {{margin_cells}} cells, ~{{margin_km}} km): quality degraded by lateral boundary conditions. Model disabled.",
+    "INVARIANTS_NOT_READY": "Invariant fields (elevation, land/sea) not downloaded yet.",
+    "SOURCE_UNREACHABLE": "Data source unreachable ({{url}}).",
+    "SOURCE_HTTP_ERROR": "HTTP error {{status}} from the data source.",
+    "SOURCE_FIELD_MISSING": "Field {{field}} missing from the source.",
+    "SOURCE_NO_RECENT_RUN": "No recent run available.",
+    "GRID_N_INVALID": "N must be 4, 9 or 16.",
+    "GRID_POINT_NOT_FOUND": "Grid point not found.",
+    "TASK_NOT_FOUND": "Task not found.",
+    "VALIDATION_ERROR": "Invalid data.",
+    "HTTP_ERROR": "Server error ({{status}}).",
+    "INTERNAL_ERROR": "Internal error.",
+    "unknown": "Unexpected error."
+  }
+}

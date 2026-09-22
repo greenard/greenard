@@ -1,0 +1,21 @@
+# Point d'entrée HTTPS unique. Par défaut : certificat d'une CA interne générée par Caddy
+# (`tls internal`) ; remplacer par `tls /certs/cert.pem /certs/key.pem` pour le certificat de l'entreprise.
+{$GREENARD_HOSTNAME:localhost} {
+	tls {$GREENARD_TLS:internal}
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+	}
+	request_body /api/* {
+		max_size 25MB
+	}
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy frontend:80
+	}
+}

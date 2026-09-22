@@ -1,0 +1,85 @@
+# Déploiement sur serveur local (voir README). Seul le port 443 (et 80 pour la redirection) est exposé.
+name: greenard
+
+x-backend: &backend
+  build: ./backend
+  env_file: .env
+  environment:
+    GREENARD_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-greenard}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}@db:5432/${POSTGRES_DB:-greenard}
+    GREENARD_REDIS_URL: redis://redis:6379/0
+    GREENARD_DATA_DIR: /data
+    HTTPS_PROXY: ${HTTPS_PROXY:-}
+    HTTP_PROXY: ${HTTP_PROXY:-}
+    NO_PROXY: db,redis,api,frontend,localhost,${NO_PROXY:-}
+  volumes:
+    - appdata:/data
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-greenard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis}
+      POSTGRES_DB: ${POSTGRES_DB:-greenard}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-greenard}"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+
+  worker-io:
+    <<: *backend
+    command: celery -A app.tasks.celery_app worker -Q io,celery -c 4 --loglevel=INFO
+
+  # Jalons 4+ : file "compute" (PyWake, WindNinja) — concurrence limitée au nombre de cœurs.
+  # worker-compute:
+  #   <<: *backend
+  #   command: celery -A app.tasks.celery_app worker -Q compute -c 2 --loglevel=INFO
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_MAP_STYLE_URL: ${VITE_MAP_STYLE_URL:-}
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2-alpine
+    ports:
+      - "443:443"
+      - "80:80"
+    environment:
+      GREENARD_HOSTNAME: ${GREENARD_HOSTNAME:-localhost}
+      GREENARD_TLS: ${GREENARD_TLS:-internal}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/certs:/certs:ro
+      - caddy_data:/data
+    depends_on:
+      - api
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  appdata:
+  caddy_data:

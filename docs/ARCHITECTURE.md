@@ -2,7 +2,7 @@
 
 > Application web de prévision météorologique (Module A « Météo ») et de prévision de production éolienne (Module B « Énergie »).
 >
-> Version 0.2 — 2026-09-22 — intègre les réponses aux questions Q1–Q7 (journal des décisions en §11). **En attente de validation finale** avant le jalon 1.
+> Version 0.3 — 2026-09-22 — v0.2 validée ; mises à jour issues du jalon 1 (voir « Écarts constatés au jalon 1 » en §11).
 >
 > Changements par rapport à la v0.1 :
 > - authentification multi-utilisateurs dès le jalon 1 (§8.1) ;
@@ -223,7 +223,7 @@ Les valeurs sont à re-vérifier au jalon 1 : les producteurs font évoluer leur
 | **ECMWF IFS HRES** (open data) | 0,25° régulière | Global | 3 h jusqu'à 144 h, puis 6 h jusqu'à 360 h (runs 00/12) | `ecmwf-opendata`, miroir AWS |
 | **ECMWF AIFS** (option) | 0,25° | Global | 6 h, 15 j | `ecmwf-opendata` |
 | **ICON global** | Icosaédrique R3B07, ~13 km, ≈ 2,95 M cellules | Global | 1 h jusqu'à 78 h, puis 3 h jusqu'à 180 h (runs 00/12) | `opendata.dwd.de` |
-| **ICON-EU** | 0,0625° régulière (interpolée par le DWD) | ~23,5°N–70,5°N, ~23,5°W–62,5°E | 1 h jusqu'à 78 h, puis 3 h jusqu'à 120 h | `opendata.dwd.de` |
+| **ICON-EU** | 0,0625° régulière (interpolée par le DWD), 1377 × 657 points | 29,5°N–70,5°N, 23,5°W–62,5°E (corrigé au jalon 1, la v0.2 indiquait à tort 23,5°N) | 1 h jusqu'à 78 h, puis 3 h jusqu'à 120 h | `opendata.dwd.de` |
 | **GEFS** | 0,25° / 0,5° selon les champs | Global | 3 h, 16 j ; 31 membres | AWS `noaa-gefs-pds` |
 | **ECMWF ENS** | 0,25° | Global | 3 h puis 6 h, 15 j ; 51 membres | `ecmwf-opendata` |
 | **ICON-EPS** | Icosaédrique R3B06 (~26 km) | Global | 1 h puis 3 h/6 h, 180 h ; 40 membres | `opendata.dwd.de` |
@@ -248,15 +248,15 @@ Les valeurs sont à re-vérifier au jalon 1 : les producteurs font évoluer leur
 #### 4.2.4 ICON-EU : contrôle de domaine
 
 - Contrôle d'appartenance au domaine du modèle, avec une **marge de sécurité** paramétrable (par défaut 5 mailles). Près du bord, les conditions aux limites latérales dégradent la qualité de la prévision.
-- Si le site est hors domaine ou dans la marge, le modèle est **désactivé** avec un message explicite (FR/EN), par exemple : *« ICON-EU ne couvre pas ce site (latitude 22,1°N, limite sud du domaine 23,5°N). Utilisez ICON global. »*
-- En pratique au Maroc : le Nord et le centre sont couverts ; la région de Dakhla est en limite ; le sud de la région Dakhla-Oued Ed-Dahab est hors domaine.
+- Si le site est hors domaine ou dans la marge, le modèle est **désactivé** avec un message explicite (FR/EN), par exemple : *« ICON-EU ne couvre pas ce site (latitude 23,7°, domaine 29,5°–70,5°N). Utilisez un modèle global. »*
+- En pratique au Maroc : couverture au nord d'environ 29,8°N (limite 29,5°N + marge de 5 mailles), soit jusqu'à Agadir / Tiznit. Guelmim, Tan-Tan, Tarfaya, Laâyoune et Dakhla sont **hors domaine**. La géométrie réelle est relue dans les en-têtes GRIB lors de la préparation des invariants et remplace la valeur du catalogue.
 
 #### 4.2.5 Attributs affichés par point
 
 | Attribut | Source |
 |---|---|
 | Distance (km) et azimut (°) site → point | `pyproj.Geod.inv` |
-| Altitude modèle | GFS : `HGT:surface`. IFS : géopotentiel `z` / 9,80665 (présence dans le flux open data à confirmer ; repli sur le fichier d'invariants ECMWF). ICON / ICON-EU : `HSURF` (invariants DWD). |
+| Altitude modèle | GFS : `HGT:surface`. IFS : géopotentiel `z` (sfc, step 0) / 9,80665, présent dans le flux open data (vérifié au jalon 1). ICON / ICON-EU : `HSURF` (invariants DWD). |
 | Altitude réelle | Copernicus DEM GLO-30 au point de grille **et** au site, avec la moyenne sur la maille (plus représentative pour la comparaison). |
 | Écart d'altitude | Alerte si \|Δz\| > seuil (par défaut 100 m, modifiable). |
 | Drapeau terre/mer | GFS `LAND`, IFS `lsm`, ICON `FR_LAND` (fraction). Un point est « mer » si la fraction de terre est < 0,5. Alerte si le site est à terre et le point en mer (côte atlantique). |
@@ -269,7 +269,7 @@ Les valeurs sont à re-vérifier au jalon 1 : les producteurs font évoluer leur
 
 | Grandeur | Niveaux disponibles (indicatifs, confirmés au jalon 2) |
 |---|---|
-| Vent U/V | GFS : 10, 20, 30, 40, 50, 80, 100 m + niveaux pression. IFS open data : 10, 100 m (+ 200 m selon disponibilité) + niveaux pression. ICON / ICON-EU : 10 m + niveaux modèle, convertis en hauteur via `HHL`, pour fournir 80/100/120/180 m par interpolation verticale **marquée comme dérivée**. |
+| Vent U/V | GFS : 10, 20, 30, 40, 50, 80, 100 m + niveaux pression. IFS open data : 10 et 100 m (vérifié au jalon 1 : pas de 200 m dans le flux open data) + niveaux pression. ICON / ICON-EU : 10 m + niveaux modèle, convertis en hauteur via `HHL`, pour fournir 80/100/120/180 m par interpolation verticale **marquée comme dérivée**. |
 | Rafales | GFS `GUST` (instantanée) ; IFS `10fg` (maximum sur la période précédente) ; ICON `VMAX_10M` (maximum depuis la dernière sortie). **La sémantique diffère** : elle est stockée en métadonnée. |
 | Température | 2 m + niveaux pression (850, 925 hPa) : utile comme indicateur de stabilité pour la calibration. |
 | Pression | Surface (`sp` / `PS`) et niveau de la mer (`msl` / `PMSL`). |
@@ -770,6 +770,17 @@ Chaque jalon se termine par une **démonstration** (scénario reproductible dans
 | Q5 | Authentification | **Multi-utilisateurs dès le départ** | Intégrée au jalon 1, rôles par projet, audit (§8.1). |
 | Q6 | IFS 0,1° / services payants | **Gratuit au départ** ; l'utilisateur décide de commander ou non un service payant | Sources `paid` désactivées par défaut, activation par un administrateur puis choix explicite de l'utilisateur, tracés dans le run (§4.3.5). |
 | Q7 | Déploiement | **Serveur local** | Docker Compose, HTTPS interne, proxy sortant, sauvegardes, 16 vCPU / 64 Go recommandés (§2.5). |
+
+### Écarts constatés au jalon 1
+
+| Sujet | Constat | Décision |
+|---|---|---|
+| Domaine ICON-EU | Limite sud à **29,5°N** (et non 23,5°N) : tout le sud à partir de Guelmim est hors domaine. | Catalogue corrigé ; géométrie relue dans le GRIB. |
+| Catalogue des modèles | Défini dans le code (`app/nwp/catalog.py`), versionné avec lui, plutôt qu'en table `nwp_model`. | Les tables référencent le modèle par son code. |
+| Merchich Sahara | PROJ ne dispose que d'une transformation « ballpark » (sans changement de datum) pour les zones Sahara Sud (26195) et une partie de Sahara Nord. | Avertissement `MERCHICH_BALLPARK` explicite, jamais de choix silencieux. |
+| Wheels pip | ecCodes, rasterio et netCDF4 installés par pip embarquent des bibliothèques natives incompatibles entre elles (plantages). | Environnement conda-forge obligatoire (`backend/environment.yml`), en dev comme en image Docker. |
+| Progression des tâches | Suivi par interrogation périodique (1 s) de `task_log`. | Le flux SSE est reporté au jalon 2 (téléchargements longs). |
+| E-mails | Les validateurs stricts refusent les domaines internes (`.local`). | Validation souple. |
 
 ### Ce dont j'aurai besoin plus tard (sans bloquer le jalon 1)
 
