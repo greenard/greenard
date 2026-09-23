@@ -3,16 +3,31 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { del, get, patch, post } from "../api/client";
-import type { CrsItem, GridPoint, ModelInfo, Project, Representations, Site } from "../api/types";
+import type { CrsItem, Farm, GridPoint, Mast, ModelInfo, Project, Representations, Site } from "../api/types";
 import CoordinateInput, { coordPayload, emptyCoord, type CoordValue } from "../components/CoordinateInput";
 import GridPointsPanel, { useGridPoints } from "../components/GridPointsPanel";
 import ArchivePanel from "../components/ArchivePanel";
 import MembersPanel from "../components/MembersPanel";
 import SiteImport from "../components/SiteImport";
 import ForecastPanel from "../forecast/ForecastPanel";
+import FarmPanel from "../farm/FarmPanel";
 import MapView from "../map/MapView";
+import MastPanel from "../mast/MastPanel";
+import TerrainPanel, { type TerrainList } from "../terrain/TerrainPanel";
 import { errorText, fmt, formatDateTime } from "../utils/format";
 import { usePrefs } from "../utils/prefs";
+
+const TABS = ["grid", "forecast", "farm", "mast", "terrain"] as const;
+type Tab = (typeof TABS)[number];
+
+/** Emprise [O, S, E, N] des éoliennes et mâts du projet (cadrage de la carte). */
+function projectBbox(farms: Farm[], masts: Mast[]): [number, number, number, number] | null {
+  const pts = [...farms.flatMap((f) => f.turbines), ...masts];
+  if (!pts.length) return null;
+  const lons = pts.map((p) => p.lon);
+  const lats = pts.map((p) => p.lat);
+  return [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)];
+}
 
 export default function ProjectPage() {
   const { projectId } = useParams();
@@ -31,14 +46,19 @@ export default function ProjectPage() {
   const [resolved, setResolved] = useState<Representations | null>(null);
   const [name, setName] = useState("");
   const [visible, setVisible] = useState<Record<string, boolean>>({});
-  const [tab, setTab] = useState<"grid" | "forecast">(() => {
+  const farms = useQuery({ queryKey: ["farms", pid], queryFn: () => get<Farm[]>(`/projects/${pid}/farms`) });
+  const masts = useQuery({ queryKey: ["masts", pid], queryFn: () => get<Mast[]>(`/projects/${pid}/masts`) });
+  const terrain = useQuery({ queryKey: ["terrain", pid], queryFn: () => get<TerrainList>(`/projects/${pid}/terrain`) });
+  const [shownLayers, setShownLayers] = useState<Record<number, boolean>>({});
+  const [tab, setTab] = useState<Tab>(() => {
     try {
-      return localStorage.getItem("greenard.tab") === "forecast" ? "forecast" : "grid";
+      const v = localStorage.getItem("greenard.tab") as Tab;
+      return TABS.includes(v) ? v : "grid";
     } catch {
       return "grid";
     }
   });
-  const chooseTab = (v: "grid" | "forecast") => {
+  const chooseTab = (v: Tab) => {
     setTab(v);
     try {
       localStorage.setItem("greenard.tab", v);
@@ -84,6 +104,10 @@ export default function ProjectPage() {
     if (resolved && coord.mode === "wgs84") setCoord((c) => ({ ...c, utmZone: resolved.utm.zone }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolved?.utm.zone]);
+
+  const bbox = projectBbox(farms.data ?? [], masts.data ?? []);
+  const projectTab = tab === "farm" || tab === "mast" || tab === "terrain";
+  const fit = projectTab && bbox ? { key: `${tab}:${bbox.join(",")}`, bbox } : null;
 
   if (project.isError) return <div className="page alert error">{errorText(t, project.error)}</div>;
 
@@ -159,39 +183,50 @@ export default function ProjectPage() {
           onMapClick={onMapClick}
           onSiteClick={setActiveId}
           onPointClick={(p) => canEdit && toggle.mutate(p)}
+          farms={farms.data ?? []}
+          masts={masts.data ?? []}
+          overlays={(terrain.data?.layers ?? []).filter((l) => shownLayers[l.id])}
+          fit={fit}
         />
-        {active && models.data && (
-          <div className="below-map">
-            <div className="site-head">
-              <h3>{active.name}</h3>
-              <span className="muted">
-                {active.lat.toFixed(6)}, {active.lon.toFixed(6)} · {t("site.demElevation")} : {fmt(active.dem_elevation_m, 0)} m ·{" "}
-                {formatDateTime(active.created_at, tz, i18n.language)}
-              </span>
-            </div>
-            <div className="tabs big" role="tablist">
-              <button className={tab === "grid" ? "tab active" : "tab"} onClick={() => chooseTab("grid")}>
-                {t("grid.title")}
+        <div className="below-map">
+          <div className="tabs big" role="tablist">
+            {TABS.map((k) => (
+              <button key={k} className={tab === k ? "tab active" : "tab"} onClick={() => chooseTab(k)}>
+                {t(`tabs.${k}`)}
               </button>
-              <button className={tab === "forecast" ? "tab active" : "tab"} onClick={() => chooseTab("forecast")}>
-                {t("fc.tab")}
-              </button>
-            </div>
-            {tab === "grid" ? (
-              <GridPointsPanel
-                key={active.id}
-                site={active}
-                models={models.data}
-                canEdit={canEdit}
-                visible={visible}
-                setVisible={setVisible}
-                points={gp.data?.points ?? []}
-              />
-            ) : (
-              <ForecastPanel key={active.id} siteId={active.id} models={models.data} points={gp.data?.points ?? []} canEdit={canEdit} />
-            )}
+            ))}
           </div>
-        )}
+          {!projectTab && !active && <p className="muted">{t("site.empty")}</p>}
+          {!projectTab && active && models.data && (
+            <>
+              <div className="site-head">
+                <h3>{active.name}</h3>
+                <span className="muted">
+                  {active.lat.toFixed(6)}, {active.lon.toFixed(6)} · {t("site.demElevation")} : {fmt(active.dem_elevation_m, 0)} m ·{" "}
+                  {formatDateTime(active.created_at, tz, i18n.language)}
+                </span>
+              </div>
+              {tab === "grid" ? (
+                <GridPointsPanel
+                  key={active.id}
+                  site={active}
+                  models={models.data}
+                  canEdit={canEdit}
+                  visible={visible}
+                  setVisible={setVisible}
+                  points={gp.data?.points ?? []}
+                />
+              ) : (
+                <ForecastPanel key={active.id} siteId={active.id} models={models.data} points={gp.data?.points ?? []} canEdit={canEdit} />
+              )}
+            </>
+          )}
+          {tab === "farm" && <FarmPanel projectId={pid} canEdit={canEdit} crsList={crs.data ?? []} />}
+          {tab === "mast" && <MastPanel projectId={pid} canEdit={canEdit} />}
+          {tab === "terrain" && (
+            <TerrainPanel projectId={pid} canEdit={canEdit} crsList={crs.data ?? []} shown={shownLayers} setShown={setShownLayers} />
+          )}
+        </div>
       </div>
     </div>
   );

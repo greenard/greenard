@@ -72,7 +72,8 @@ label.check { flex-direction: row; align-items: center; gap: 6px; color: var(--t
 .sidebar { overflow-y: auto; padding: 12px; border-right: 1px solid var(--border); background: #fafbfc; }
 .main-col { display: flex; flex-direction: column; overflow-y: auto; }
 .map-wrap { position: relative; height: 52vh; min-height: 360px; flex: none; }
-.map { position: absolute; inset: 0; }
+/* sélecteur renforcé : maplibre-gl.css impose .maplibregl-map { position: relative } */
+.map-wrap > .map { position: absolute; inset: 0; }
 .map-basemap { position: absolute; top: 10px; left: 10px; padding: 6px 8px; margin: 0; z-index: 2; }
 .below-map { padding: 12px; }
 .site-head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
@@ -124,3 +125,19 @@ legend.sub { font-weight: 500; color: var(--muted); font-size: 12px; margin-top:
 .chart-card { border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin: 8px 0; min-width: 0; }
 .chart-card h4 { margin: 0 0 4px; font-size: 13px; }
 .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 8px; }
+/* jalon 3 : parc, mât, terrain */
+.panel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 10px; align-items: start; }
+.panel-grid > .card { margin-bottom: 0; min-width: 0; }
+.farm { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }
+.dataset { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dataset.active { font-weight: 600; }
+.dataset-view { margin-top: 10px; flex-basis: 100%; min-width: 0; font-weight: 400; }
+.dataset-view td { white-space: nowrap; }
+.mapping { max-height: 340px; overflow-y: auto; }
+.mapping select, .mapping input { padding: 2px 4px; font-size: 12px; }
+.table .num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+input.short { width: 80px; padding: 2px 4px; }
+.row > label.narrow.wide { flex: 0 0 260px; }
+.z0-editor { margin-top: 8px; max-height: 360px; overflow-y: auto; }
+.table tr.clickable { cursor: pointer; }
+.table tr.clickable:hover { background: #f5f7f9; }

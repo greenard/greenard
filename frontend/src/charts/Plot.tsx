@@ -39,7 +39,16 @@ export default function Plot({ data, layout = {}, height = 340 }: Props) {
   }, [data, layout, height]);
   useEffect(() => {
     const el = ref.current;
+    // `responsive` ne suit que la fenêtre : on suit aussi la taille du conteneur (grilles, onglets).
+    const ro =
+      el && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            if (plotlyPromise && (el as any)._fullLayout) void plotlyPromise.then((P) => P.Plots.resize(el));
+          })
+        : null;
+    if (el) ro?.observe(el);
     return () => {
+      ro?.disconnect();
       if (el && plotlyPromise) void plotlyPromise.then((P) => P.purge(el));
     };
   }, []);

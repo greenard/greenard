@@ -1,7 +1,8 @@
 import maplibregl, { type GeoJSONSource, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { GridPoint, ModelInfo, Site } from "../api/types";
+import { fetchImage, get } from "../api/client";
+import type { Farm, GridPoint, Mast, ModelInfo, Site, TerrainLayer } from "../api/types";
 
 export type Basemap = "osm" | "offline";
 
@@ -48,7 +49,16 @@ interface Props {
   onMapClick: (lat: number, lon: number) => void;
   onSiteClick: (id: number) => void;
   onPointClick: (p: GridPoint) => void;
+  farms?: Farm[];
+  masts?: Mast[];
+  overlays?: TerrainLayer[];
+  /** emprise [ouest, sud, est, nord] à cadrer quand `fitKey` change */
+  fit?: { key: string; bbox: [number, number, number, number] } | null;
 }
+
+type RasterOverlay = { url: string; coords: [[number, number], [number, number], [number, number], [number, number]] };
+
+const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c);
 
 const EMPTY: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -62,7 +72,19 @@ function addAppLayers(map: maplibregl.Map) {
   ensure("gridpoints");
   ensure("sites");
   ensure("preview");
+  ensure("turbines");
+  ensure("masts");
+  ensure("mapvec");
   if (!map.getLayer("domain-lines")) {
+    map.addLayer({
+      id: "mapvec-lines",
+      type: "line",
+      source: "mapvec",
+      paint: {
+        "line-color": ["case", ["==", ["get", "kind"], "contour"], "#8a6d3b", "#1f7a4d"],
+        "line-width": ["case", ["==", ["get", "kind"], "contour"], 0.6, 1.4],
+      },
+    });
     map.addLayer({
       id: "domain-lines",
       type: "line",
@@ -97,6 +119,23 @@ function addAppLayers(map: maplibregl.Map) {
         "circle-stroke-color": "#ffd400",
         "circle-stroke-width": 2,
       },
+    });
+    map.addLayer({
+      id: "turbine-circles",
+      type: "circle",
+      source: "turbines",
+      paint: {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 3, 13, 7],
+        "circle-color": ["case", ["get", "neighbour"], "#8c8c8c", "#1d4ed8"],
+        "circle-stroke-color": "#fff",
+        "circle-stroke-width": 1.5,
+      },
+    });
+    map.addLayer({
+      id: "mast-circles",
+      type: "circle",
+      source: "masts",
+      paint: { "circle-radius": 7, "circle-color": "#e8590c", "circle-stroke-color": "#111", "circle-stroke-width": 2 },
     });
     map.addLayer({
       id: "preview-circle",
@@ -168,6 +207,14 @@ export default function MapView(props: Props) {
         .addTo(map);
     });
     map.on("mouseleave", "gp-circles", () => popup.remove());
+    for (const layer of ["turbine-circles", "mast-circles"]) {
+      map.on("mousemove", layer, (e) => {
+        const f = e.features?.[0];
+        if (!f || f.geometry.type !== "Point") return;
+        popup.setLngLat(f.geometry.coordinates as [number, number]).setHTML(String(f.properties?.html ?? "")).addTo(map);
+      });
+      map.on("mouseleave", layer, () => popup.remove());
+    }
     map.on("style.load", () => {
       // Les sources et couches applicatives disparaissent à chaque changement de style.
       addAppLayers(map);
@@ -255,12 +302,96 @@ export default function MapView(props: Props) {
           };
         }),
     });
+    (map.getSource("turbines") as GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: (props.farms ?? []).flatMap((f) =>
+        f.turbines.map((w) => ({
+          type: "Feature" as const,
+          geometry: { type: "Point" as const, coordinates: [w.lon, w.lat] },
+          properties: {
+            neighbour: f.is_neighbour,
+            html: `<b>${esc(w.label)}</b> · ${esc(f.name)}<br/>${esc(w.type_name)} · ${w.hub_height_m} m` +
+              (w.dem_elevation_m === null ? "" : `<br/>z ${w.dem_elevation_m.toFixed(0)} m`),
+          },
+        })),
+      ),
+    });
+    (map.getSource("masts") as GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: (props.masts ?? []).map((m) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [m.lon, m.lat] },
+        properties: { html: `<b>${esc(m.name)}</b><br/>${m.lat.toFixed(5)}, ${m.lon.toFixed(5)}` },
+      })),
+    });
     (map.getSource("preview") as GeoJSONSource).setData(
       props.preview
         ? { type: "Feature", geometry: { type: "Point", coordinates: [props.preview.lon, props.preview.lat] }, properties: {} }
         : EMPTY,
     );
   }, [props, styleVersion]);
+
+  // couches de terrain : images (MNT ombré, z0) et lignes des cartes WAsP
+  const rasters = useRef<Record<number, RasterOverlay | "loading">>({});
+  const vectors = useRef<Record<number, GeoJSON.FeatureCollection>>({});
+  const [overlayTick, setOverlayTick] = useState(0);
+  const overlayKey = (props.overlays ?? []).map((o) => o.id).join(",");
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getSource("mapvec")) return;
+    const shown = props.overlays ?? [];
+    const wanted = new Set(shown.filter((o) => o.kind === "dem" || o.kind === "roughness").map((o) => o.id));
+    for (const layer of map.getStyle().layers ?? []) {
+      const id = Number(layer.id.replace("terrain-", ""));
+      if (layer.id.startsWith("terrain-") && !wanted.has(id)) {
+        map.removeLayer(layer.id);
+        map.removeSource(layer.id);
+      }
+    }
+    for (const o of shown) {
+      if (o.kind === "roughness_map") {
+        if (!vectors.current[o.id])
+          void get<GeoJSON.FeatureCollection>(`/terrain/${o.id}/geojson`).then((gj) => {
+            vectors.current[o.id] = gj;
+            setOverlayTick((v) => v + 1);
+          });
+        continue;
+      }
+      if (!wanted.has(o.id)) continue;
+      const cached = rasters.current[o.id];
+      if (cached === undefined) {
+        rasters.current[o.id] = "loading";
+        void fetchImage(`/terrain/${o.id}/preview.png`)
+          .then(({ url, headers }) => {
+            const [w, s, e, n] = JSON.parse(headers.get("X-Bounds") ?? "[]") as number[];
+            rasters.current[o.id] = { url, coords: [[w, n], [e, n], [e, s], [w, s]] };
+            setOverlayTick((v) => v + 1);
+          })
+          .catch(() => delete rasters.current[o.id]);
+        continue;
+      }
+      if (cached === "loading" || map.getSource(`terrain-${o.id}`)) continue;
+      map.addSource(`terrain-${o.id}`, { type: "image", url: cached.url, coordinates: cached.coords });
+      map.addLayer(
+        { id: `terrain-${o.id}`, type: "raster", source: `terrain-${o.id}`, paint: { "raster-opacity": o.kind === "dem" ? 0.75 : 0.6 } },
+        "mapvec-lines",
+      );
+    }
+    (map.getSource("mapvec") as GeoJSONSource).setData({
+      type: "FeatureCollection",
+      features: shown.filter((o) => o.kind === "roughness_map").flatMap((o) => vectors.current[o.id]?.features ?? []),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overlayKey, overlayTick, styleVersion]);
+
+  // cadrage sur le parc / les mâts
+  const fitKey = props.fit?.key ?? "";
+  useEffect(() => {
+    const map = mapRef.current;
+    const b = props.fit?.bbox;
+    if (map && b) map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 60, maxZoom: 13, duration: 800 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey]);
 
   // recentrage sur le site actif (dès que ses coordonnées sont connues)
   const active = props.sites.find((x) => x.id === props.activeSiteId);

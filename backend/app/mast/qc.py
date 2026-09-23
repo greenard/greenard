@@ -168,6 +168,7 @@ def summary(df: pd.DataFrame, sensors: list[SensorDef]) -> dict:
         counts = {name: int(((f & bit) > 0).sum()) for bit, name in FLAG_NAMES.items()}
         valid = f == 0
         monthly = pd.Series(valid, index=months).groupby(level=0).mean() * 100
+        events = np.flatnonzero(f & np.uint16(0xFFFF ^ MISSING))
         out["sensors"].append(
             {
                 "code": s.code,
@@ -177,6 +178,8 @@ def summary(df: pd.DataFrame, sensors: list[SensorDef]) -> dict:
                 "valid_pct": round(float(valid.mean() * 100), 2),
                 "flags": counts,
                 "monthly_valid_pct": {str(k): round(float(v), 1) for k, v in monthly.items()},
+                # premier enregistrement signalé (hors manquant) : point d'entrée du zoom dans l'interface
+                "first_event_utc": df.index[events[0]].isoformat() if events.size else None,
             }
         )
     return out

@@ -130,3 +130,13 @@ export async function downloadFile(path: string): Promise<void> {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
+
+/** Image authentifiée (aperçus de terrain) → URL blob + en-têtes utiles. */
+export async function fetchImage(path: string): Promise<{ url: string; headers: Headers }> {
+  const go = () =>
+    fetch(`${BASE}${path}`, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}, credentials: "same-origin" });
+  let r = await go();
+  if (r.status === 401 && (await refreshAccessToken())) r = await go();
+  if (!r.ok) throw await parseError(r);
+  return { url: URL.createObjectURL(await r.blob()), headers: r.headers };
+}

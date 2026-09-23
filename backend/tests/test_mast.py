@@ -177,3 +177,7 @@ def test_qc_summary(checked):
     ws80 = next(x for x in s["sensors"] if x["code"] == "ws_80_n")
     assert 60 < ws80["valid_pct"] < 99 and ws80["flags"]["tower_shadow"] > 0
     assert set(ws80["monthly_valid_pct"]) == set(s["months"])
+    # premier défaut du capteur à 40 m : le premier pic injecté (hors manquants)
+    ws40 = next(x for x in s["sensors"] if x["code"] == "ws_40")
+    assert ws40["first_event_utc"] is not None
+    assert pd.Timestamp(ws40["first_event_utc"]) <= out.index[-1]
