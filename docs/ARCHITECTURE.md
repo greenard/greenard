@@ -740,7 +740,7 @@ Chaque jalon se termine par une **démonstration** (scénario reproductible dans
 |---|---|---|---|
 | 1 | **Carte et points de grille** (livré) | Squelette Docker Compose, BDD et migrations, **authentification multi-utilisateurs et rôles par projet**, conversions CRS, saisie (formulaire, clic, CSV/KML), catalogue des modèles, recherche des points (régulière et ICON), altitude modèle vs DEM, masque terre/mer, carte MapLibre avec couches par modèle, i18n FR/EN. | Site près d'Essaouira (terrain côtier) et site près de Dakhla (ICON-EU désactivé). |
 | 2 | **Téléchargement des prévisions** (livré) | (2a) Open-Meteo pour le prototypage ; (2b) GRIB natifs GFS / IFS / ICON / ICON-EU ; ensembles ; harmonisation temporelle ; exports ; séries temporelles, rose des vents, comparaison ; **archiveur Celery beat**. | Téléchargement multi-modèles sur 2 points, export NetCDF, pas de 10 min marqué « interpolé ». |
-| 3 | **Import du parc et du mât** | Layout, `.wtg`/CSV, mât (CSV, TOA5, exports NRG/Windographer), contrôle qualité avec drapeaux, cisaillement et TI par secteur, MNT GLO-30, WorldCover et z0. | Parc de démonstration + mât synthétique avec gel et ombrage détectés. |
+| 3 | **Import du parc et du mât** (livré) | Layout, `.wtg`/CSV, mât (CSV, TOA5, exports NRG/Windographer), contrôle qualité avec drapeaux, cisaillement et TI par secteur, MNT GLO-30, WorldCover et z0. | Parc de démonstration + mât synthétique avec gel et ombrage détectés. |
 | 4 | **PyWake et terrain** | **Import des speed-ups (format pivot + parseur natif WEng d'après votre exemple)**, repli `.rsf`/`.wrg` et WindNinja, RIX, XRSite, modèles de sillage, LUT, densité, champ de sillage sur la carte, tests IEA37 et Horns Rev. | Production brute par éolienne sur une prévision réelle, carte de sillage à 270° / 8 m/s. |
 | 5 | **Pertes et probabiliste** | Moteur de pertes, cascade, calendriers, chaîne par membre d'ensemble, quantiles, rapport PDF. | P10–P90 sur 14 jours, waterfall, PDF. |
 | 6 | **Calibration ML et évaluation** | Biais secteur × saison, quantile mapping, LightGBM quantile, pondération des modèles, métriques et skill scores, recalibration des intervalles. | Calibration sur l'historique fourni, rapport de scores par échéance. |
@@ -793,6 +793,16 @@ Chaque jalon se termine par une **démonstration** (scénario reproductible dans
 | Open-Meteo | Donne un pas horaire même pour les modèles 3-/6-horaires, et le run n'est pas toujours exposé. | Seules les échéances natives sont conservées. Le run est lu dans les métadonnées Open-Meteo, sinon déduit de la latence typique (information inscrite dans l'extrait). |
 | Archives historiques | Open-Meteo « Historical Forecast » assemble plusieurs runs successifs : ce n'est pas la prévision d'un run unique. | Archives natives via AWS (GFS depuis 2021, IFS depuis 2023) et archivage automatique. Les API « Previous Runs » d'Open-Meteo seront évaluées au jalon 6. |
 | ECMWF 0,1° | Catalogue temps réel ouvert (CC-BY 4.0) depuis le 01/10/2025. La résolution 9 km doit rejoindre le sous-ensemble gratuit « plus tard en 2026 », avec 2 h de latence. Les gros volumes peuvent entraîner des frais de service. | Source `ecmwf_hres_01` réservée, désactivée. Voir `docs/ECMWF_0p1.md`. |
+
+### Écarts constatés au jalon 3
+
+| Sujet | Constat | Décision |
+|---|---|---|
+| Terrain | Le téléchargement du MNT GLO-30 et de WorldCover, la table z0 et l'import `.map` étaient répartis entre les jalons 3 et 4. | Livrés dès le jalon 3 pour que le contrôle qualité du mât (z0 amont) et la carte en profitent. Le jalon 4 garde les speed-ups, RIX et PyWake. |
+| Formats de mât binaires | `.rld` (NRG) et TOB1 (Campbell) exigent des outils propriétaires ou un compte en ligne. | Refus explicite (`MAST_BINARY_FORMAT`) ; import des exports texte. `nrgpy` possible sur votre accord. |
+| Horodatage | Les loggers écrivent tantôt le début, tantôt la fin de l'intervalle, souvent en heure locale fixe. | Convention interne unique : **fin d'intervalle, UTC**. Convention et fuseau de la source choisis à l'import et tracés dans le jeu de données. |
+| Données de test | Pas de `.wtg`, de mât ni d'export WAsP Engineering réels disponibles. | Générateurs synthétiques documentés (`tests/farmgen.py`, `tests/mastgen.py`) ; validation sur vos fichiers dès réception. |
+| `.map` | Lecture et affichage seulement. | Rasterisation (z0, altitude) à décider au jalon 4 selon les speed-ups WAsP Engineering fournis. |
 
 ### Ce dont j'aurai besoin plus tard
 

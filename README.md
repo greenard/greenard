@@ -5,7 +5,7 @@ et de prévision de production éolienne (PyWake, pertes IEC 61400-15-2, probabi
 
 - Architecture et décisions : [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (v0.3)
 - Hypothèses et limites : [`docs/LIMITS.md`](docs/LIMITS.md)
-- Démonstrations : [jalon 1](docs/demo/jalon1/README.md), [jalon 2](docs/demo/jalon2/README.md)
+- Démonstrations : [jalon 1](docs/demo/jalon1/README.md), [jalon 2](docs/demo/jalon2/README.md), [jalon 3](docs/demo/jalon3/README.md)
 - Accès ECMWF 0,1° : [`docs/ECMWF_0p1.md`](docs/ECMWF_0p1.md)
 
 ## Avancement
@@ -14,7 +14,7 @@ et de prévision de production éolienne (PyWake, pertes IEC 61400-15-2, probabi
 |---|---|---|
 | 1 | Carte, points de grille, authentification | **livré** |
 | 2 | Téléchargement des prévisions | **livré** |
-| 3 | Import du parc et du mât | à venir |
+| 3 | Import du parc et du mât, terrain | **livré** |
 | 4 | PyWake et terrain | à venir |
 | 5 | Pertes et probabiliste | à venir |
 | 6 | Calibration ML et évaluation | à venir |
@@ -23,7 +23,7 @@ et de prévision de production éolienne (PyWake, pertes IEC 61400-15-2, probabi
 
 Prérequis : Linux, Docker ≥ 24 avec le plugin Compose, accès Internet sortant vers
 `noaa-gfs-bdp-pds.s3.amazonaws.com`, `ecmwf-forecasts.s3.amazonaws.com`, `opendata.dwd.de`,
-`copernicus-dem-30m.s3.amazonaws.com` (directement ou via le proxy de l'entreprise).
+`copernicus-dem-30m.s3.amazonaws.com`, `esa-worldcover.s3.eu-central-1.amazonaws.com` (directement ou via le proxy de l'entreprise).
 Dimensionnement recommandé : 16 vCPU, 64 Go de RAM, 1 To SSD (minimum 8 vCPU / 32 Go).
 
 ```bash

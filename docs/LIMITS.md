@@ -101,3 +101,49 @@ Document tenu à jour à chaque jalon (§8 de la note d'architecture).
   commerciale en mode `public`). Altitude modèle et terre/mer non affichées pour cette grille.
 - Correctif : le calendrier des échéances natives utilisé pour filtrer Open-Meteo sautait d'un pas
   aux transitions (ex. GFS 121 h au lieu de 123 h, IFS 147 h au lieu de 150 h) ; corrigé et testé.
+
+## Jalon 3 — Parc, mât et terrain
+
+### Types d'éoliennes et layout
+- `.wtg` : WAsP (XML `WindTurbineGenerator`) avec plusieurs tables de densité ; puissances en W converties en kW.
+  Les champs absents du fichier (vitesse de redémarrage, hauteurs de moyeu, parfois la densité de référence) sont
+  à compléter dans le formulaire ; un essai à blanc affiche les contrôles avant l'enregistrement.
+- Pas de fichier constructeur réel dans l'environnement de développement : les tests et la démonstration utilisent
+  une courbe **générique synthétique** (4,2 MW, 136 m). Un `.wtg` réel reste nécessaire pour valider le parseur.
+- Contrôles d'espacement sur la distance horizontale entre moyeux : erreur sous 1 D, avertissement sous 2 D. Pas
+  encore de contrôle elliptique (ex. 3 D × 5 D selon la direction dominante) : prévu au jalon 4, quand la rose du
+  site sera disponible dans le calcul de sillage.
+- Shapefile : archive zip avec `.prj` obligatoire. Sans `.prj`, refus explicite (`LAYOUT_SHP_NO_PRJ`), jamais de
+  SCR supposé.
+
+### Mât de mesure
+- Formats **texte** uniquement : Campbell TOA5, export texte NRG SymphoniePRO, export Windographer, CSV générique.
+  Les fichiers binaires propriétaires (`.rld` NRG, `.dat` binaire Campbell TOB1…) sont refusés avec
+  `MAST_BINARY_FORMAT` : les exporter en texte depuis le logiciel du fabricant. Alternative possible : intégrer
+  `nrgpy` (conversion `.rld` via l'API NRG, nécessite un compte NRG) — non fait sans votre accord.
+- Mappage des colonnes : proposé à partir des noms (conventions NRG et génériques), toujours modifiable. La hauteur
+  d'un capteur qui n'est pas dans le nom (pression, température) doit être saisie.
+- Fuseau : UTC, décalage fixe ou zone IANA. Avec une zone IANA, les instants ambigus du changement d'heure sont
+  marqués manquants plutôt que devinés ; un logger reste presque toujours sur un décalage fixe.
+- Contrôle qualité automatique, sans validation manuelle pour l'instant : manquant, hors plage, valeur bloquée,
+  givrage (T < 2 °C, HR > 85 % si mesurée, et capteur figé ou écart-type nul), ombrage du mât (±30° derrière le
+  bras), pics (écart à la médiane glissante > max(5 MAD, 3 m/s)), cisaillement incohérent. Les seuils sont dans
+  `app/mast/qc.py`. **Alternative** : un écran d'invalidation manuelle par période (jalon 6, avec la calibration).
+- Cisaillement α calculé sur les moyennes de groupe (vitesses des deux hauteurs valides en même temps), par secteur,
+  heure et saison. TI représentative = moyenne + 1,28 σ par classe de vitesse (IEC 61400-1 éd. 4).
+- **Données de démonstration synthétiques** (profil Weibull, α = 0,14, défauts injectés à des instants connus) :
+  les chiffres affichés dans la démo ne décrivent aucun site réel.
+
+### Terrain
+- MNT Copernicus GLO-30 (AWS, licence Copernicus libre) et ESA WorldCover 2021 v200 (10 m, CC-BY 4.0), téléchargés
+  sur l'emprise des éoliennes, mâts et sites élargie d'une marge (5 km par défaut). Emprise vide → refus
+  `TERRAIN_NO_EXTENT`.
+- La rugosité z0 vient d'une **table classe → z0 éditable** (valeurs par défaut prudentes, à ajuster par projet).
+  WorldCover date de 2021 : les changements récents (défrichement, nouvelles constructions) n'y figurent pas.
+- z0 amont par secteur : moyenne géométrique pondérée par 1/distance dans un rayon de 3 km. C'est une approche
+  simple, à visée de contrôle : ce n'est pas le modèle de changement de rugosité de WAsP, qui reste la référence
+  pour les speed-ups (jalon 4).
+- Carte WAsP `.map` : lue et **affichée** (lignes de rugosité et courbes de niveau) ; elle n'est pas encore
+  rasterisée ni utilisée dans un calcul. Le format ne contient pas de SCR : il est demandé à l'import.
+- MNT importé (GeoTIFF) reprojeté en EPSG:4326 ; un GeoTIFF sans SCR est refusé (`TERRAIN_TIFF_NO_CRS`).
+
